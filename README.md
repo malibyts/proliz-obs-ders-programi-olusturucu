@@ -1,17 +1,19 @@
 # Ders Programı Planlayıcı
 
-OBS'den müfredatı ve bölüm ders programını kopyalayıp yapıştırarak, alacağın dersler için çakışmayan haftalık programları çıkaran küçük bir araç. Tek bir HTML dosyası, kurulum gerektirmiyor.
+OBS'den müfredatı ve bölüm ders programını kopyalayıp yapıştırarak, alacağınız dersler için çakışmayan haftalık programları çıkaran küçük bir araç. Tek bir HTML dosyası, kurulum gerektirmez.
 
-## Nasıl kullanılır
+## Nasıl Kullanılır
 
-1. OBS'de Müfredat Bilgi Paketi sayfasını kopyala, 1. adıma yapıştır.
-2. Bölüm Ders Programı sayfasını kopyala, 2. adıma yapıştır. Alttan ya da üstten dersin varsa o sınıfın programını da ekle.
-3. Yarıyılını seç ve alacağın dersleri işaretle.
-4. Boş kalmasını istediğin saatler varsa işaretle.
-5. Çıkan programlardan birini seç, yazdır ya da ders listesini kopyala.
+1. OBS'de "Müfredat Bilgi Paketi" sayfasını kopyala (ilk başta seçmeli derslerinizin içindeki ders havuzunu açınız), 1. adıma yapıştırın.
+2. Bölüm Ders Programı sayfasını kopyala, 2. adıma yapıştır. Alttan ya da üstten dersin varsa o sınıfın programını da ekleyin.
+3. Yarıyılınızı seçin ve alacağınız dersleri işaretleyin.
+4. Boş kalmasını istediğiniz saatler varsa işaretleyin.
+5. Çıkan programlardan birisini seç, yazdır ya da ders listesini kopyalayın.
 
-## Bilmen gerekenler
+## Bilmeniz Gerekenler
 
-- Her şey tarayıcında çalışıyor, yapıştırdığın veriler hiçbir yere gönderilmiyor.
-- Proliz OBS kullanan üniversiteler için yazıldı. Ders programı ekranının hem eski hem yeni görünümünü okuyabiliyor.
-- Üniversitenin resmi bir uygulaması değil. Ders kaydından önce şube ve saatleri OBS'den kontrol et.
+- Her şey tarayıcıda çalışıyor, yapıştırdığın veriler hiçbir yere gönderilmez.
+- Proliz OBS kullanan üniversiteler için yazıldı. Ders programı ekranının hem eski hem yeni görünümünü okuyabilir.
+- Hiçbir üniversitenin resmi bir uygulaması değildir.
+- Ders kaydından önce lütfen şube ve saatleri OBS'den kontrol ediniz.
+
