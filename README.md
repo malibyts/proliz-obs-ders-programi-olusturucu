@@ -1,3 +1,5 @@
+# > https://malibyts.github.io/proliz-obs-ders-programi-olusturucu/
+
 # Ders Programı Planlayıcı
 
 OBS'den müfredatı ve bölüm ders programını kopyalayıp yapıştırarak, alacağınız dersler için çakışmayan haftalık programları çıkaran küçük bir araç. Tek bir HTML dosyası, kurulum gerektirmez.
