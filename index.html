@@ -1,0 +1,3072 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ders Programı Planlayıcı</title>
+<style>
+:root{
+  /* Griler logodaki griye (#575656) göre, mavi tonu olmadan */
+  --ink:#1f1d1e;
+  --ink-2:#575656;
+  --ink-3:#767272;
+  --base:#ece9e9;
+  --surface:#ffffff;
+  --surface-2:#f7f5f5;
+  --line:#d5d0d0;
+  --line-soft:#e6e2e2;
+  --accent:#921831;          /* OSTİM Teknik Üniversitesi logosundaki bordo */
+  --accent-ink:#671122;
+  --accent-soft:#f7eef0;
+  --accent-soft-2:#f0dfe2;   /* seçmeli grubu satırı üzerine gelince */
+  --accent-light:#e89cab;    /* koyu üst çubuktaki simge */
+  /* Hata rengi bordodan ayırt edilsin diye daha turuncuya kaydırıldı */
+  --alert:#b5401f;
+  --alert-soft:#fcebe6;
+  --ok:#1f6b45;
+  --ok-soft:#e0f0e7;
+  --warn:#8a5a10;
+  --warn-soft:#fbf0da;
+  --sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  --r:6px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;max-width:100%}
+/* Yatay taşmayı belgenin kökünde kes. Geniş içeriklerin (inceleme tabloları,
+   takvim) kendi kaydırma kutuları var; sayfanın kendisi asla yana kaymaz.
+   'hidden' yerine 'clip': yeni bir kaydırma alanı açmaz, sticky'yi bozmaz. */
+@supports (overflow:clip){ html,body{overflow-x:clip} }
+body{
+  font-family:var(--sans);
+  background:var(--base);
+  color:var(--ink);
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.011em}
+h2{font-size:1.32rem;letter-spacing:-.018em}
+h3{font-size:1.02rem}
+p{margin:0 0 .7em}
+a{color:var(--accent)}
+button{font-family:inherit;font-size:inherit}
+input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+
+/* ---------- topbar ---------- */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:10px 18px;background:var(--ink);color:#f3f0f0;
+  position:sticky;top:0;z-index:50;
+}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand .mark{
+  font-family:var(--mono);color:var(--accent-light);font-size:1.05rem;letter-spacing:-2px;
+}
+.brand h1{font-size:1rem;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand small{color:#a8a2a2;font-size:.78rem;white-space:nowrap}
+.topbar-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+
+/* ---------- buttons ---------- */
+.btn{
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);
+  padding:6px 12px;border-radius:var(--r);cursor:pointer;
+  font-weight:520;line-height:1.35;white-space:nowrap;
+  transition:background .12s ease, border-color .12s ease;
+}
+.btn:hover{background:var(--surface-2)}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-ink)}
+.btn.ghost{background:transparent;border-color:#4d4849;color:#e4dfdf}
+.btn.ghost:hover{background:#353132}
+.btn.sm{padding:3px 8px;font-size:.83rem}
+.btn.danger{color:var(--alert);border-color:#efc7bc}
+.btn.danger:hover{background:var(--alert-soft)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+/* ---------- layout ---------- */
+.layout{display:flex;align-items:flex-start;gap:0;min-height:calc(100vh - 46px)}
+.rail{
+  width:206px;flex:0 0 206px;background:var(--surface);
+  border-right:1px solid var(--line);padding:14px 0;
+  position:sticky;top:46px;align-self:stretch;
+}
+.railitem{
+  display:grid;grid-template-columns:22px 1fr;gap:2px 10px;align-items:baseline;
+  width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;
+  padding:9px 14px 9px 11px;cursor:pointer;color:var(--ink-2);
+}
+.railitem b{
+  font-family:var(--mono);font-size:.82rem;font-weight:600;color:var(--ink-3);
+  border:1px solid var(--line-soft);border-radius:50%;width:21px;height:21px;
+  display:grid;place-items:center;grid-row:span 2;align-self:center;
+}
+.railitem span{font-weight:560;font-size:.94rem;color:var(--ink)}
+.railitem em{font-style:normal;font-size:.78rem;color:var(--ink-3);grid-column:2;line-height:1.3}
+.railitem:hover{background:var(--surface-2)}
+.railitem.is-active{border-left-color:var(--accent);background:var(--accent-soft)}
+.railitem.is-active b{background:var(--accent);border-color:var(--accent);color:#fff}
+.railitem.is-done b{color:var(--ok);border-color:#a9cebc}
+.railitem:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+
+.stage{flex:1;min-width:0;padding:22px 26px 90px}
+.step{display:none;max-width:1180px}
+.step.is-active{display:block}
+.step-head{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.step-head p{color:var(--ink-2);max-width:74ch;margin:.45em 0 0}
+
+/* ---------- panels ---------- */
+.panel{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:16px 18px;margin-bottom:14px;
+}
+.panel>h3{margin-bottom:.35em}
+.panel .hint{color:var(--ink-2);font-size:.9rem;max-width:76ch}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row.tight{gap:6px}
+.spacer{flex:1}
+.muted{color:var(--ink-3)}
+.small{font-size:.86rem}
+
+/* ---------- paste zone ---------- */
+.paste{
+  border:2px dashed var(--line);border-radius:var(--r);background:var(--surface-2);
+  min-height:96px;padding:14px;cursor:text;color:var(--ink);
+  display:block;text-align:left;transition:border-color .12s,background .12s;
+  white-space:pre-wrap;overflow:auto;max-height:220px;font-size:.86rem;
+}
+.paste:focus{outline:none;border-color:var(--accent);background:#fff}
+.paste:empty::before{
+  content:attr(data-ph);display:block;text-align:center;padding-top:22px;
+  color:var(--ink-3);pointer-events:none;font-size:.92rem;
+}
+.onizleme{
+  margin-top:9px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface-2);
+  font-family:var(--mono);font-size:.76rem;line-height:1.5;white-space:pre;overflow:auto;
+  max-height:190px;padding:9px 11px;color:var(--ink-2);
+}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r);max-height:440px}
+table.data{border-collapse:collapse;width:100%;font-size:.87rem;background:var(--surface)}
+table.data th,table.data td{border-bottom:1px solid var(--line-soft);padding:5px 8px;text-align:left;vertical-align:top}
+table.data thead th{
+  background:var(--surface-2);position:sticky;top:0;z-index:2;
+  font-weight:600;font-size:.8rem;color:var(--ink-2);border-bottom:1px solid var(--line);
+}
+table.data tbody tr:hover{background:var(--surface-2)}
+table.data td input,table.data td select{
+  width:100%;min-width:52px;border:1px solid transparent;background:transparent;
+  padding:2px 4px;border-radius:3px;font-size:.87rem;
+}
+table.data td input:hover,table.data td select:hover{border-color:var(--line-soft)}
+table.data td input:focus,table.data td select:focus{border-color:var(--accent);background:#fff;outline:none}
+table.data td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+table.data tr.grp td{background:var(--accent-soft)}
+table.data tr.grp td input,table.data tr.grp td select{font-weight:620}
+table.data tr.opt td:nth-child(2){padding-left:28px;position:relative}
+table.data tr.opt td:nth-child(2)::before{content:'↳';position:absolute;left:11px;top:5px;color:var(--ink-3)}
+table.data tr.ign td{opacity:.45}
+.grp-label{display:flex;gap:10px;align-items:center;flex:1;min-width:0;cursor:pointer;margin:0}
+.pickrow.is-grp{background:var(--accent-soft)}
+.pickrow.is-grp:hover{background:var(--accent-soft-2)}
+.optrow{background:var(--surface-2);display:flex;gap:9px;align-items:center;padding:3px 12px 3px 40px;font-size:.83rem;color:var(--ink-2)}
+.optrow .code{font-family:var(--mono);font-size:.79rem;flex:0 0 92px}
+.optrow .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.optrow input[type=checkbox]{width:14px;height:14px;accent-color:var(--accent);margin:0}
+.optrow.is-off .name,.optrow.is-off .code{text-decoration:line-through;opacity:.5}
+.optbar{background:var(--surface);display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:6px 12px 6px 40px}
+.optaciklama{background:var(--accent-soft);color:var(--accent-ink);padding:7px 12px 7px 40px;font-size:.83rem;line-height:1.42}
+.tally{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.86rem;color:var(--ink-2)}
+.tally b{color:var(--ink)}
+.map-row>*{min-width:0}
+.map-row select{border:1px solid var(--line);border-radius:4px;padding:3px 5px;background:#fff;font-size:.83rem;width:100%;max-width:100%}
+select,input,textarea{max-width:100%}
+
+/* ---------- chips / badges ---------- */
+.badge{
+  display:inline-block;padding:1px 7px;border-radius:20px;font-size:.75rem;font-weight:600;
+  background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line-soft);
+}
+.badge.z{background:#f1eeee;color:var(--ink-2);border-color:var(--line)}
+.badge.s{background:var(--warn-soft);color:var(--warn);border-color:#e6d3a8}
+.badge.ok{background:var(--ok-soft);color:var(--ok);border-color:#a9cebc}
+.badge.bad{background:var(--alert-soft);color:var(--alert);border-color:#efc7bc}
+
+.k{font-family:var(--mono);font-size:.82em;border:1px solid var(--line);border-bottom-width:2px;
+   border-radius:4px;padding:0 4px;background:var(--surface-2);white-space:nowrap}
+.jsuyari{background:var(--alert);color:#fff;padding:12px 16px;font-size:.92rem;line-height:1.45}
+.jsuyari b{display:block;margin-bottom:3px}
+.jsuyari code{font-family:var(--mono);font-size:.85em;background:rgba(0,0,0,.22);padding:2px 6px;border-radius:3px;
+  display:block;margin-top:6px;white-space:pre-wrap;word-break:break-word}
+.note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:9px 12px;border-radius:0 var(--r) var(--r) 0;font-size:.88rem;margin:10px 0}
+.note.bad{border-left-color:var(--alert);background:var(--alert-soft)}
+.note.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+
+/* ---------- course pick list ---------- */
+.picklist{display:grid;grid-template-columns:minmax(0,1fr);gap:1px;background:var(--line-soft);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.picklist>*{min-width:0}
+.optlabel{flex:0 0 auto}
+.optsec{flex:1;min-width:0;max-width:100%;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:#fff;font-size:.83rem}
+.pickgroup{background:var(--surface-2);padding:5px 12px;font-weight:600;font-size:.84rem;color:var(--ink-2)}
+.pickrow{background:var(--surface);display:flex;gap:10px;align-items:center;padding:6px 12px;font-size:.9rem}
+.pickrow:hover{background:var(--surface-2)}
+.pickrow input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);flex:0 0 auto;margin:0}
+.pickrow .code{font-family:var(--mono);font-size:.83rem;color:var(--ink-2);flex:0 0 96px}
+.pickrow .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pickrow>label{min-width:0}
+.paste,.onizleme{max-width:100%}
+
+/* ---------- weekly grid ---------- */
+.wk{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden;user-select:none}
+.wk-head{display:flex;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.wk-head .cell{flex:1;min-width:0;padding:6px 2px;text-align:center;font-size:.82rem;font-weight:600;color:var(--ink-2);border-left:1px solid var(--line-soft)}
+.wk-head .gun-kisa{display:none}
+.wk-gutter{flex:0 0 52px;position:relative}
+.wk-body{display:flex;position:relative}
+.wk-body .wk-gutter{border-right:1px solid var(--line-soft)}
+.wk-col{flex:1;position:relative;border-left:1px solid var(--line-soft)}
+.wk-line{position:absolute;left:0;right:0;border-top:1px solid var(--line-soft)}
+.wk-line.half{border-top-style:dotted}
+.wk-hour{
+  position:absolute;right:6px;transform:translateY(-50%);
+  font-family:var(--mono);font-size:.72rem;color:var(--ink-3);font-variant-numeric:tabular-nums;
+}
+.ev{
+  position:absolute;left:2px;right:2px;border-radius:4px;padding:3px 5px;overflow:hidden;
+  font-size:.76rem;line-height:1.24;border-left:3px solid;
+}
+.ev b{display:block;font-family:var(--mono);font-size:.75rem;font-weight:700}
+.ev span{display:block;color:rgba(0,0,0,.62);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev span.who{font-style:italic;color:rgba(0,0,0,.52)}
+.ev.blocked{background:repeating-linear-gradient(45deg,#eeebeb,#eeebeb 5px,#e2dede 5px,#e2dede 10px);border-left-color:#b2acac;color:var(--ink-3)}
+
+/* blocked-time picker */
+.bt{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface);font-size:.75rem}
+.bt table{border-collapse:collapse;width:100%}
+.bt th{background:var(--surface-2);font-weight:600;color:var(--ink-2);padding:3px;font-size:.74rem}
+.bt td{border:1px solid var(--line-soft);height:17px;cursor:pointer;padding:0}
+.bt td.h{font-family:var(--mono);color:var(--ink-2);text-align:right;padding-right:6px;cursor:default;border-left:0;width:104px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bt .sa-kisa{display:none}
+.bt td{height:22px}
+.bt td.on{background:#c8c2c2}
+
+/* ---------- results ---------- */
+.resbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.counter{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.9rem;color:var(--ink-2);min-width:96px}
+.reslist{display:grid;gap:6px;max-height:520px;overflow:auto;padding-right:4px}
+.rescard{
+  border:1px solid var(--line);border-radius:var(--r);background:var(--surface);
+  padding:8px 11px;cursor:pointer;font-size:.86rem;
+}
+.rescard:hover{background:var(--surface-2)}
+.rescard.is-sel{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.rescard .top{display:flex;justify-content:space-between;gap:8px;font-weight:600}
+.rescard .stats{color:var(--ink-2);font-size:.79rem;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.split{display:grid;grid-template-columns:296px 1fr;gap:14px;align-items:start}
+.split>*{min-width:0}
+
+.legend{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.legend .lg{font-size:.76rem;padding:2px 7px;border-radius:3px;border-left:3px solid}
+
+/* ---------- mobil ---------- */
+@media (max-width:760px){
+  /* Üst çubuk sabit kalınca, iki satıra taşıp adım çubuğunu ekran dışına itiyordu.
+     Telefonda sabitlemeyi adımlara veriyoruz; asıl gereken onlar. */
+  .layout{min-height:auto}
+  .topbar{position:static;padding:8px 12px;flex-wrap:wrap;gap:8px}
+  .rail{position:sticky;top:0;z-index:40;background:var(--surface);box-shadow:0 2px 6px rgba(31,29,30,.10)}
+  .brand small{display:none}
+  .topbar-actions{width:100%;justify-content:stretch}
+  .topbar-actions .btn,.topbar-actions label.btn{flex:1 1 0;text-align:center;padding:8px 6px;font-size:.83rem}
+  h2{font-size:1.14rem}
+  .panel{padding:13px 12px}
+  .step-head p{font-size:.93rem}
+
+  /* iOS odaklanınca sayfayı yakınlaştırmasın */
+  input,select,textarea{font-size:16px}
+  table.data td input,table.data td select{font-size:15px}
+
+  /* dokunma hedefleri büyüsün */
+  .btn{padding:8px 12px}
+  .btn.sm{padding:6px 10px;font-size:.85rem}
+  .pickrow{padding:9px 11px;flex-wrap:wrap;gap:6px 8px}
+  .pickrow input[type=checkbox]{width:20px;height:20px}
+  .pickrow.is-grp>.grp-label{flex:1 1 100%}
+  .pickrow .code{flex:0 0 76px;font-size:.78rem}
+  .pickrow .name{white-space:normal;flex:1 1 150px}
+  .optlabel{flex:1 1 100%}
+  .optrow{padding:8px 11px 8px 28px;flex-wrap:wrap}
+  .optrow input[type=checkbox]{width:18px;height:18px}
+  .optrow .code{flex:0 0 70px}
+  .optrow .name{white-space:normal;flex:1 1 60%}
+  .optbar,.optaciklama{padding-left:11px}
+
+  /* Hiçbir içerik sayfayı yatay genişletmesin. Geniş olanların kendi
+     kaydırması var (inceleme tabloları); gerisi ekrana sığdırılıyor.
+     'clip' dikey akışı bozmaz, 'hidden' gibi yeni bir kaydırma alanı açmaz. */
+  /* Genişlikleri "otomatik" bırakmak yerine kesinleştir: hiçbir kutu
+     içeriğiyle birlikte büyüyemez, geniş içerik kendi kutusunda kayar. */
+  .layout,.stage,.step,.panel,.tbl-wrap,.picklist,.row{width:100%;max-width:100%;min-width:0}
+  .stage{overflow-x:clip}
+  .panel{overflow-x:clip}
+  .tbl-wrap{overflow:auto}
+  table.data{min-width:560px}        /* tablo kendi kutusunda kayar */
+
+  /* Düğmeler satırın sonunda ekran dışında kalmasın: tam genişlik, alt satır */
+  .row>.spacer{display:none}
+  .panel>.row>.btn,
+  .step>.row>.btn{flex:1 1 100%}
+  .panel>.row,.step>.row{gap:8px}
+  .legend .lg{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* kapalı saat ızgarası da sığsın */
+  .bt table{min-width:0;width:100%}
+  .bt td.h{width:56px;font-size:.66rem;padding-right:4px}
+  .bt .sa-uzun{display:none}
+  .bt .sa-kisa{display:inline}
+  .bt td{height:28px}
+
+  /* takvim ekrana sığar: ayrıntılar altta zaten listeleniyor */
+  .wk-gutter{flex:0 0 34px}
+  .wk-hour{font-size:.6rem;right:3px}
+  .wk-head .cell{font-size:.72rem;padding:5px 1px}
+  .wk-head .gun-uzun{display:none}
+  .wk-head .gun-kisa{display:inline}
+  .ev{left:1px;right:1px;padding:2px 3px;border-left-width:2px}
+  .ev b{font-size:.6rem;white-space:normal;word-break:break-word;line-height:1.18}
+  .ev .saat{font-size:.57rem}
+  .ev .ad,.ev .who,.ev .yer{display:none}
+  .ev.blocked span{font-size:.55rem}
+  .bt td{touch-action:none}
+  .bt td.h{touch-action:auto}
+  .tbl-wrap{max-height:340px}
+
+  /* sonuç ekranı: takvim önce, alternatif listesi sonra */
+  .reslist{order:2;max-height:230px}
+  .resbar{gap:7px}
+  .counter{min-width:auto}
+  .ev{font-size:.7rem;padding:2px 4px}
+  .ev b{font-size:.7rem}
+  .legend .lg{font-size:.72rem}
+}
+@media (max-width:900px){
+  .layout{flex-direction:column}
+  .rail{width:100%;flex:none;position:static;display:flex;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:0}
+  .railitem{width:auto;flex:0 0 auto;border-left:0;border-bottom:3px solid transparent;padding:8px 13px;grid-template-columns:20px auto}
+  .railitem em{display:none}
+  .railitem.is-active{border-left-color:transparent;border-bottom-color:var(--accent)}
+  .stage{padding:16px 13px 70px}
+  .split{grid-template-columns:1fr}
+}
+@media print{
+  .topbar,.rail,.resbar,.reslist,.noprint{display:none!important}
+  .stage{padding:0}
+  body{background:#fff}
+  .panel{border:0;padding:0}
+  .split{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<noscript>
+  <div class="jsuyari">
+    <b>JavaScript kapalı olduğu için sayfa çalışmıyor.</b>
+    Dosyayı Chrome, Firefox ya da Samsung Internet gibi bir tarayıcıda aç. Dosya yöneticisinin
+    önizlemesi ve HTML görüntüleyici uygulamaları JavaScript çalıştırmıyor.
+  </div>
+</noscript>
+<div id="hataKutu" class="jsuyari" hidden></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark">▤▦</span>
+    <h1>Ders programı planlayıcı</h1>
+    <small class="noprint">OBS'den kopyala, yapıştır</small>
+  </div>
+  <div class="topbar-actions noprint">
+    <button id="btnReset" class="btn ghost">Sıfırla</button>
+    <label class="btn ghost" style="cursor:pointer">Dosyadan yükle<input type="file" id="fileLoad" hidden accept=".json,application/json"></label>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="rail" id="rail" aria-label="Adımlar">
+    <button class="railitem is-active" data-step="1"><b>1</b><span>Müfredat</span><em>Dersler ve yarıyıllar</em></button>
+    <button class="railitem" data-step="2"><b>2</b><span>Ders programı</span><em>Şubeler ve saatler</em></button>
+    <button class="railitem" data-step="3"><b>3</b><span>Durumum</span><em>Alacağın dersler</em></button>
+    <button class="railitem" data-step="4"><b>4</b><span>Kontrol</span><em>Boş saatler, eşleşmeler</em></button>
+    <button class="railitem" data-step="5"><b>5</b><span>Sonuç</span><em>Çakışmayan programlar</em></button>
+  </nav>
+
+  <main class="stage">
+
+    <!-- ============ ADIM 1 ============ -->
+    <section class="step is-active" data-step="1">
+      <div class="step-head">
+        <h2>Müfredatı yapıştır</h2>
+        <p>OBS'de Müfredat Bilgi Paketi sayfasını aç, tablonun hepsini seçip kopyala ve aşağıya yapıştır. Derslerin kodu, adı, yarıyılı ve zorunlu/seçmeli bilgisi buradan alınıyor.</p>
+        <div class="note">Kopyalamadan önce Teknik Seçmeli Ders I gibi satırların yanındaki <span class="k">+</span> işaretine basıp grupları aç. Açmazsan gruptaki dersler kopyaya girmez, seçenekleri 3. adımda kendin seçmen gerekir.</div>
+      </div>
+      <div class="panel">
+        <div id="curPaste"></div>
+      </div>
+      <div class="panel" id="curReviewPanel" hidden>
+        <h3>Okunan dersler</h3>
+        <p class="hint">Yanlış okunan bir şey varsa hücreye tıklayıp düzeltebilirsin. Rol sütunu satırın ne olduğunu gösteriyor: ders, seçmeli grubu, grubun bir seçeneği ya da yok sayılan satır.</p>
+        <div id="curNotes"></div>
+        <div id="curReview"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn sm" id="curAddRow">Satır ekle</button>
+          <div class="spacer"></div>
+          <button class="btn primary" id="curNext">Devam et</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ADIM 3 ============ -->
+    <section class="step" data-step="3">
+      <div class="step-head">
+        <h2>Bu dönem hangi dersleri alacaksın?</h2>
+        <p>Yarıyılını seç ve alacağın dersleri işaretle. Seçmeli gruplarında istemediğin dersleri de burada çıkarabilirsin. Her dersin yanında bu dönem kaç şubesinin açıldığı yazıyor.</p>
+      </div>
+      <div class="panel">
+        <div class="row">
+          <label>Bulunduğum yarıyıl
+            <select id="selYariyil" style="margin-left:6px;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:#fff"></select>
+          </label>
+          <label style="display:flex;gap:6px;align-items:center">
+            <input type="checkbox" id="chkOnlyMatching" checked style="accent-color:var(--accent)"> Sadece aynı dönemin (güz/bahar) yarıyıllarını göster
+          </label>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Alınacak dersler</h3>
+        <p class="hint">Hiçbir ders otomatik işaretlenmiyor. Seçmeli grupları tek satırda duruyor, seçeneklerini açıp görebilirsin.</p>
+        <div class="note">Seçenekleri tek tek kapatmana gerek yok, bu dönem açılmayan dersler zaten hesaba girmiyor. Bir ders birden fazla seçmeli grubunda geçebilir ama sadece birini doldurur. Yani üç ELEC grubun varsa bu dönem açılmış üç farklı ders gerekiyor.</div>
+        <div class="row" style="margin-bottom:10px">
+          <button class="btn sm" id="pickThisTerm">Bu yarıyılın derslerini işaretle</button>
+          <button class="btn sm" id="pickClear">Seçimi temizle</button>
+          <div class="spacer"></div>
+          <span class="tally" id="pickTally"></span>
+        </div>
+        <div id="pickList"></div>
+        <div class="row" style="margin-top:10px">
+          <div class="spacer"></div>
+          <button class="btn primary" id="pickNext">Devam et</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ADIM 2 ============ -->
+    <section class="step" data-step="2">
+      <div class="step-head">
+        <h2>Bölüm ders programını yapıştır</h2>
+        <p>OBS'de Bölüm Ders Programı sayfasını seçip kopyala ve aşağıya yapıştır. Alttan ya da üstten dersin varsa Sınıf seçimini değiştirip o sınıfın programını da yapıştır, öncekinin üstüne eklenir.</p>
+        <div class="note">Program dönem başında sık değişiyor. Güncel halini yapıştırdığında saati değişen bir ders varsa sana sorulur. Eskisini baştan silmek istersen yapıştırdıktan sonra çıkan Önceki satırları sil kutusunu işaretle. Müfredat ve seçtiğin dersler bundan etkilenmez.</div>
+      </div>
+      <div class="panel">
+        <div id="schPaste"></div>
+      </div>
+      <div class="panel" id="schReviewPanel" hidden>
+        <h3>Okunan ders saatleri <span class="badge" id="schCount"></span></h3>
+        <p class="hint">Her satır bir dersin haftalık bir oturumu. Gün ve saatlere bir göz at, yanlış varsa düzeltebilirsin.</p>
+        <div id="schReview"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn sm" id="schAddRow">Satır ekle</button>
+          <button class="btn sm danger" id="schClear">Hepsini sil</button>
+          <div class="spacer"></div>
+          <button class="btn primary" id="schNext">Devam et</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ADIM 4 ============ -->
+    <section class="step" data-step="4">
+      <div class="step-head">
+        <h2>Boş saatler ve kontrol</h2>
+        <p>Boş kalmasını istediğin saatler varsa işaretle. Yoksa doğrudan programları oluşturabilirsin.</p>
+      </div>
+
+      <div class="panel">
+        <h3>Boş bırakmak istediğin saatler</h3>
+        <p class="hint">Kutulara dokunarak ya da sürükleyerek işaretle. İşaretli saatlere ders konmaz.</p>
+        <div id="blockGrid" class="bt" style="max-width:620px"></div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn sm" id="blockClear">İşaretleri temizle</button>
+        </div>
+      </div>
+
+      <div class="panel" id="durumOzet"></div>
+
+      <div id="ileriPanel" hidden>
+        <div class="panel">
+          <h3>Eşleşmeler</h3>
+          <p class="hint">Seçtiğin derslerin ders programındaki karşılıkları. Kodu ya da adı değişmiş bir ders bulunamazsa altında benzer dersler listelenir, doğru olanı seçip Eşleştir'e bas.</p>
+          <div id="matchReport"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="spacer"></div>
+        <button class="btn primary" id="goSolve">Programları oluştur</button>
+      </div>
+    </section>
+
+    <!-- ============ ADIM 5 ============ -->
+    <section class="step" data-step="5">
+      <div class="step-head">
+        <h2>Çakışmayan programlar</h2>
+        <p id="solveSummary">Henüz hesaplanmadı.</p>
+      </div>
+      <div class="resbar noprint">
+        <button class="btn" id="prev">‹ Önceki</button>
+        <span class="counter" id="counter">—</span>
+        <button class="btn" id="next">Sonraki ›</button>
+        <label class="small">Sırala
+          <select id="sortBy" style="margin-left:5px;padding:3px 5px;border:1px solid var(--line);border-radius:4px;background:#fff">
+            <option value="freeday">En çok boş gün</option>
+            <option value="gap">En az ara</option>
+            <option value="late">Geç başlayan</option>
+            <option value="early">Erken biten</option>
+            <option value="compact">En sıkışık</option>
+          </select>
+        </label>
+        <div class="spacer"></div>
+        <button class="btn" id="btnPrint">Yazdır / PDF</button>
+        <button class="btn" id="btnCopyList">Ders listesini kopyala</button>
+      </div>
+      <div class="split">
+        <div class="reslist noprint" id="reslist"></div>
+        <div>
+          <div id="wkHost"></div>
+          <div class="legend" id="legend"></div>
+          <div class="panel" style="margin-top:12px">
+            <h3>Seçilen şubeler</h3>
+            <div id="chosenTbl"></div>
+          </div>
+          <div class="panel noprint">
+            <h3>Kaydet</h3>
+            <p class="hint">Sayfayı kapatınca her şey silinir. Dosyaya kaydedersen sonra Dosyadan yükle ile kaldığın yerden devam edebilirsin. Program değiştiyse sadece yenisini yapıştırman yeter.</p>
+            <button class="btn" id="btnSave">Dosyaya kaydet</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* Ana koddan önce: bir hata olursa sayfada görünür olsun, sessizce boş kalmasın. */
+window.addEventListener('error', function(ev){
+  try{
+    var k = document.getElementById('hataKutu');
+    if(!k) return;
+    k.hidden = false;
+    k.innerHTML = '<b>Sayfa yüklenirken hata oluştu.</b>Sayfayı yenilemeyi dene. Hata:';
+    var c = document.createElement('code');
+    c.textContent = (ev.message||'bilinmeyen hata') + '  \u00b7  satır ' + (ev.lineno||'?') + ':' + (ev.colno||'?');
+    k.appendChild(c);
+  }catch(e){}
+});
+</script>
+<script>
+/* =========================================================================
+   Ders Programı Planlayıcı
+   Tek dosya, bağımlılıksız. Tarayıcıda çift tıklayarak açılır.
+   ========================================================================= */
+(function(){
+"use strict";
+
+/* ------------------------------------------------------------------ yardımcılar */
+const $  = (s,r)=> (r||document).querySelector(s);
+const $$ = (s,r)=> Array.from((r||document).querySelectorAll(s));
+const el = (tag,props,kids)=>{
+  const n=document.createElement(tag);
+  if(props) for(const k in props){
+    if(k==='class') n.className=props[k];
+    else if(k==='html') n.innerHTML=props[k];
+    else if(k==='text') n.textContent=props[k];
+    else if(k.startsWith('on')) n.addEventListener(k.slice(2),props[k]);
+    else if(props[k]!==null && props[k]!==undefined && props[k]!==false) n.setAttribute(k,props[k]);
+  }
+  (kids||[]).forEach(c=>{ if(c) n.appendChild(typeof c==='string'?document.createTextNode(c):c); });
+  return n;
+};
+const clean = s => (s==null?'':String(s)).replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+/* Türkçe küçültme + aksan sadeleştirme (arama/eşleştirme için) */
+function trLower(s){ return String(s||'').replace(/I/g,'ı').replace(/İ/g,'i').toLowerCase(); }
+function deTr(s){
+  return trLower(s)
+    .replace(/ı/g,'i').replace(/ş/g,'s').replace(/ğ/g,'g')
+    .replace(/ü/g,'u').replace(/ö/g,'o').replace(/ç/g,'c').replace(/â/g,'a').replace(/î/g,'i').replace(/û/g,'u');
+}
+
+const DAY_NAMES = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
+const DAY_SHORT = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+
+/* Uzun isimler önce taranır ki "pazartesi" içinde "pazar", "cumartesi" içinde "cuma" yakalanmasın */
+const DAY_PATTERNS = [
+  [5, 'cumartesi|c\\.?\\s?tesi|\\bcmt\\b|saturday|\\bsat\\b'],
+  [0, 'pazartesi|p\\.?\\s?tesi|\\bpzt\\b|\\bpts\\b|monday|\\bmon\\b'],
+  [6, 'pazar|sunday|\\bsun\\b|\\bpaz\\b'],
+  [1, 'sali|tuesday|\\btue\\b|\\bsal\\b|\\bsl\\b'],
+  [2, 'carsamba|wednesday|\\bwed\\b|\\bcar\\b|\\bcrs\\b|\\bcrs\\b'],
+  [3, 'persembe|thursday|\\bthu\\b|\\bper\\b|\\bprs\\b'],
+  [4, 'cuma|friday|\\bfri\\b|\\bcum\\b']
+];
+
+/* Metindeki gün adlarını konumlarıyla birlikte bulur */
+function detectDays(raw){
+  let t = deTr(raw);
+  const found = [];
+  for(const [d,src] of DAY_PATTERNS){
+    const rx = new RegExp(src,'g');
+    let m;
+    while((m = rx.exec(t))){
+      found.push({day:d, idx:m.index});
+      // aynı yeri başka kalıp tekrar yakalamasın diye maskele (uzunluk korunur)
+      t = t.slice(0,m.index) + '\u0001'.repeat(m[0].length) + t.slice(m.index+m[0].length);
+      rx.lastIndex = m.index + m[0].length;
+    }
+  }
+  found.sort((a,b)=>a.idx-b.idx);
+  return found;
+}
+function detectSingleDay(raw){ const d=detectDays(raw); return d.length?d[0].day:-1; }
+/* Metnin tamamı bir gün adı mı? ("Pazartesi" evet, "Pazartesi 09:00" hayır) */
+function pureDay(raw){
+  const t = deTr(raw).replace(/[^a-z]/g,'');
+  const listeler = [
+    ['pazartesi','sali','carsamba','persembe','cuma','cumartesi','pazar'],
+    ['pzt','sal','car','per','cum','cmt','paz'],
+    ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'],   // OBS'nin İngilizce arayüzü
+    ['mon','tue','wed','thu','fri','sat','sun']
+  ];
+  for(const l of listeler){ const i = l.indexOf(t); if(i>=0) return i; }
+  return -1;
+}
+/* Öğretim elemanı unvanları */
+const TITLE_RE = /\b(prof|doc|dr|doktor|ogr|ars|okt|uzm|gor|uyesi|egitmen)\b/;
+
+const hhmm = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+function toMin(h,mi){ return (+h)*60 + (+(mi||0)); }
+
+/* Ders saati numarası -> saat aralığı (ayarlanabilir) */
+let SLOT = {start: 8*60+30, len: 50, gap: 10};
+function slotRange(n){
+  const s = SLOT.start + (n-1)*(SLOT.len+SLOT.gap);
+  return {start:s, end:s+SLOT.len};
+}
+
+/* Metinden saat aralıklarını çıkarır. slotMode=true ise sayılar ders saati numarasıdır. */
+function parseTimes(raw, slotMode){
+  const t = String(raw||'').replace(/\u00a0/g,' ');
+  const out = [];
+  const push=(s,e,idx)=>{ if(e<=s) e=s+SLOT.len; if(s>=0&&e<=24*60) out.push({start:s,end:e,idx:idx}); };
+
+  if(slotMode){
+    // "3-4", "3,4,5", "5" gibi ders saati numaraları
+    const rx=/\d{1,2}/g; let m; const nums=[];
+    while((m=rx.exec(t))) nums.push({n:+m[0], idx:m.index});
+    if(nums.length){
+      // ardışık grupları birleştir
+      let i=0;
+      while(i<nums.length){
+        let j=i;
+        while(j+1<nums.length && nums[j+1].n===nums[j].n+1) j++;
+        const a=slotRange(nums[i].n), b=slotRange(nums[j].n);
+        push(a.start,b.end,nums[i].idx);
+        i=j+1;
+      }
+    }
+    return out;
+  }
+
+  let m, any=false;
+  // 08:30-10:20  /  08.30 - 10.20
+  let rx=/(\d{1,2})[:.](\d{2})\s*(?:-|–|—|\/|>|ile)\s*(\d{1,2})[:.](\d{2})/g;
+  while((m=rx.exec(t))){ push(toMin(m[1],m[2]), toMin(m[3],m[4]), m.index); any=true; }
+  if(any) return out;
+  // 0830-1020
+  rx=/\b(\d{2})(\d{2})\s*(?:-|–|—|\/)\s*(\d{2})(\d{2})\b/g;
+  while((m=rx.exec(t))){ push(toMin(m[1],m[2]), toMin(m[3],m[4]), m.index); any=true; }
+  if(any) return out;
+  // 9-11  /  09 - 11
+  rx=/\b(\d{1,2})\s*(?:-|–|—)\s*(\d{1,2})\b/g;
+  while((m=rx.exec(t))){
+    const a=+m[1], b=+m[2];
+    if(a<=23&&b<=24&&b>a){ push(toMin(a,0), toMin(b,0), m.index); any=true; }
+  }
+  if(any) return out;
+  // tek başlangıç saati: 08:30
+  rx=/(\d{1,2})[:.](\d{2})/g;
+  while((m=rx.exec(t))){ const s=toMin(m[1],m[2]); push(s, s+SLOT.len, m.index); }
+  return out;
+}
+
+/* ------------------------------------------------------------- tablo okuma */
+/* Hücre metni, tarayıcının ekranda gösterdiği gibi satırlara bölünür: <br> ve blok öğeler
+   (div, p, li, iç tablo satırı…) yeni satır başlatır. Yeni OBS ızgarasında bir hücrede alt alta
+   birden çok ders kartı durduğu için kartların satırları birbirine yapışmamalı. */
+const BLOK_ETIKET_RE = /^(ADDRESS|ARTICLE|ASIDE|BLOCKQUOTE|CAPTION|CENTER|DD|DIV|DL|DT|FIELDSET|FIGCAPTION|FIGURE|FOOTER|FORM|H[1-6]|HEADER|HR|LI|MAIN|NAV|OL|P|PRE|SECTION|TABLE|TBODY|TFOOT|THEAD|TR|UL)$/;
+function cellText(td){
+  const out=[];
+  const yuru = n=>{
+    if(n.nodeType===3){ out.push(n.nodeValue); return; }
+    if(n.nodeType!==1) return;
+    const tag = String(n.tagName||'').toUpperCase();
+    if(/^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test(tag)) return;
+    const st = (n.getAttribute && n.getAttribute('style')) || '';
+    if(/display\s*:\s*none/i.test(st)) return;               // ekranda görünmeyen ipucu metinleri
+    if(tag==='BR'){ out.push('\n'); return; }
+    const blok = BLOK_ETIKET_RE.test(tag) || /display\s*:\s*(block|flex|grid|list-item|table)\b/i.test(st);
+    if(blok) out.push('\n');
+    Array.from(n.childNodes).forEach(yuru);
+    if(tag==='TD' || tag==='TH') out.push(' ');
+    if(blok) out.push('\n');
+  };
+  Array.from(td.childNodes).forEach(yuru);
+  return out.join('').replace(/\u00a0/g,' ')
+    .split('\n').map(s=>s.replace(/[ \t]+/g,' ').trim()).filter(Boolean).join('\n');
+}
+
+/* HTML tablosunu rowspan/colspan açılmış matrise çevirir */
+function tableToMatrix(tbl){
+  const grid=[];
+  Array.from(tbl.rows).forEach((tr,r)=>{
+    if(!grid[r]) grid[r]=[];
+    let c=0;
+    Array.from(tr.cells).forEach(td=>{
+      while(grid[r][c]) c++;
+      const rs=Math.max(1,td.rowSpan||1), cs=Math.max(1,td.colSpan||1);
+      const cell={text:cellText(td), rs:rs, cs:cs, r0:r, c0:c, node:td};
+      for(let i=0;i<rs;i++){
+        if(!grid[r+i]) grid[r+i]=[];
+        for(let j=0;j<cs;j++) grid[r+i][c+j]=cell;
+      }
+      c+=cs;
+    });
+  });
+  const w = grid.reduce((a,g)=>Math.max(a,g.length),0);
+  grid.forEach((g,r)=>{ for(let i=0;i<w;i++) if(!g[i]) g[i]={text:'',rs:1,cs:1,r0:-1,c0:i}; });
+  return grid.filter(g=>g.length);
+}
+
+/* Gün panelli düzen: dış tabloda "Pazartesi | Salı" başlığı, altında her gün için ayrı iç tablo.
+   Belge sırasında gün adlarını ve panel tablolarını toplayıp doğrusal bir matrise çevirir. */
+function panelMatrixFromDoc(doc){
+  const nodes = Array.from(doc.querySelectorAll('table, td, th, div, span, p, b, strong, font, h1, h2, h3, h4'));
+  const akis=[];
+  nodes.forEach(node=>{
+    if(node.tagName==='TABLE'){
+      if(node.querySelector('table')) return;                  // sadece en içteki tablolar
+      const m = tableToMatrix(node);
+      const saatli = m.filter(r=>r.some(c=>/\d{1,2}[:.]\d{2}\s*[-–—]\s*\d{1,2}[:.]\d{2}/.test(c.text))).length;
+      if(saatli>=1) akis.push({t:'panel', m:m});
+      return;
+    }
+    if(node.querySelector('*')) return;                        // sadece yaprak öğeler
+    const d = pureDay(node.textContent||'');
+    if(d<0) return;
+    // Liste biçimli tabloların "Gün" sütunundaki hücreler panel başlığı değildir
+    const tablo = node.closest ? node.closest('table') : null;
+    if(tablo && !tablo.querySelector('table')) return;
+    akis.push({t:'day', d:d});
+  });
+  if(akis.filter(e=>e.t==='panel').length < 2) return null;
+
+  const matrix=[]; let bekleyen=[], sonPaneldi=false;
+  akis.forEach(ev=>{
+    if(ev.t==='day'){
+      if(sonPaneldi){ bekleyen=[]; sonPaneldi=false; }
+      bekleyen.push(ev.d); return;
+    }
+    sonPaneldi = true;
+    const d = bekleyen.length ? bekleyen.shift() : -1;
+    if(d<0) return;
+    matrix.push([{text:DAY_NAMES[d], rs:1, cs:1, r0:matrix.length, c0:0, dayMark:d}]);
+    ev.m.forEach(r=> matrix.push(r));
+  });
+  return matrix.length ? matrix : null;
+}
+
+/* Panodaki HTML'den işe yarar tabloları çıkarır (iç içe layout tablolarını eler) */
+function tablesFromHtml(html){
+  let doc;
+  try{ doc = new DOMParser().parseFromString(html,'text/html'); }catch(e){ return []; }
+  const panel = panelMatrixFromDoc(doc);
+  if(panel) return [panel];
+  const all = Array.from(doc.querySelectorAll('table'));
+  const leaves = all.filter(t=>!t.querySelector('table'));
+  // Ders kartları hücre içinde kendi küçük tablolarında olabilir; o zaman takvim ızgarası
+  // "en içteki tablo" olmaz. İçinde tablo bulunan ama kendisi gün × saat ızgarası olanları da aday say.
+  const icIceIzgaralar = leaves.length ? all.filter(t=>t.querySelector('table'))
+    .map(tableToMatrix)
+    .filter(m => m.length>=3 && /^gun-(sutun|satir)$/.test(analyzeShape(m))) : [];
+  const cands = (leaves.length?leaves:all)
+    .map(tableToMatrix)
+    .filter(m => m.length>=2 && m[0].length>=2)
+    .filter(m => m.some(r=>r.some(c=>c.text)))
+    .concat(icIceIzgaralar);
+  cands.sort((a,b)=> (b.length*b[0].length) - (a.length*a[0].length));
+  if(!cands.length) return [];
+  // en büyük tabloyla aynı sütun sayısına sahip olanları birleştir (sayfalanmış listeler için)
+  const w = cands[0][0].length;
+  const same = cands.filter(m=>m[0].length===w);
+  const rest = cands.filter(m=>m[0].length!==w).slice(0,4);
+  let first = cands[0];
+  if(same.length>1){
+    first = same[0].slice();
+    for(let i=1;i<same.length;i++) same[i].slice(1).forEach(r=>first.push(r));
+  }
+  return [first].concat(rest);
+}
+
+/* Düz metni (TSV veya çok boşlukla ayrılmış) matrise çevirir */
+function matrixFromText(text){
+  let lines = String(text||'').split(/\r?\n/).map(l=>l.replace(/\u00a0/g,' '));
+  // Bazı OBS kopyalarında (özellikle mobilde) bir satırın hücreleri alt alta,
+  // her biri TEK sekmeyle başlayıp tek hücre içerecek şekilde gelir. Bunları birleştir.
+  // Not: sol sütunu boş olan normal TSV tablolarında da satırlar sekmeyle başlar;
+  // onları bozmamak için satırda başka sekme olmaması şartı aranır.
+  const devam = lines.filter(l=>/^\t[^\t]*$/.test(l)).length;
+  if(devam > lines.length*0.3){
+    const birlesik=[];
+    lines.forEach(l=>{
+      if(/^\t[^\t]*$/.test(l) && birlesik.length) birlesik[birlesik.length-1] += l;
+      else birlesik.push(l);
+    });
+    lines = birlesik;
+  }
+  lines = lines.filter(l=>l.trim());
+  if(!lines.length) return [];
+  const tabbed = lines.filter(l=>l.indexOf('\t')>=0).length > lines.length*0.4;
+  const rows = lines.map((l,r)=>{
+    const parts = tabbed ? l.split('\t') : l.split(/\s{2,}|\s*\|\s*|\s*;\s*/);
+    return parts.map((p,c)=>({text:p.trim(), rs:1, cs:1, r0:r, c0:c}));
+  });
+  const w = rows.reduce((a,r)=>Math.max(a,r.length),0);
+  rows.forEach((r,ri)=>{ for(let c=r.length;c<w;c++) r[c]={text:'',rs:1,cs:1,r0:ri,c0:c}; });
+  return rows;
+}
+
+/* Yeni OBS "Bölüm Ders Programı" ekranı tek bir haftalık ızgara: satırlar saat, sütunlar gün,
+   hücrede alt alta birden çok ders kartı. Kopyalanan düz metinde hücreler SEKME ile ayrılır;
+   hücre içindeki satırlarla tablo satırları ise aynı satır sonunu kullanır. Tablo satırının başı,
+   sekmeden hemen önce gelen saat hücresinden ("09:00-09:50⇥") anlaşılır. Biçim tutmazsa null. */
+const SAAT_HUCRE_RE = /^\d{1,2}[:.]\d{2}(\s*[-–—]\s*\d{1,2}[:.]\d{2})?$/;
+function izgaraMetni(text){
+  const t = String(text||'').replace(/\r\n?/g,'\n').replace(/\u00a0/g,' ');
+  if(t.indexOf('\t')<0) return null;
+  const satirlar = t.split('\n');
+  const saatSekme = satirlar.filter(l=>/^\s*\d{1,2}[:.]\d{2}\s*[-–—]\s*\d{1,2}[:.]\d{2}\s*\t/.test(l)).length;
+  const ayrac = satirlar.filter(l=>/^[ \t]*\t[ \t]*$/.test(l)).length;
+  const kodlu = satirlar.filter(l=>l.indexOf('\t')<0 && kodSatiri(l)).length;
+  // Hücre ayracı ya tek başına bir satırdadır ("⇥") ya da hücre metni sekmeden hemen sonra başlar
+  const sekme = (t.match(/\t/g)||[]).length;
+  if(saatSekme<2 || kodlu<2 || (ayrac<2 && sekme<saatSekme*2)) return null;
+
+  const parcalar = t.split('\t');
+  const once=[], rows=[]; let row=null;
+  parcalar.forEach((p,pi)=>{
+    const ls = p.split('\n').map(x=>x.trim());
+    let son = ls.length-1; while(son>=0 && !ls[son]) son--;
+    // sekmeyle biten parçanın son satırı saatse yeni tablo satırı başlar;
+    // ondan önceki satırlar bir önceki tablo satırının son hücresine aittir
+    if(pi<parcalar.length-1 && son>=0 && SAAT_HUCRE_RE.test(ls[son])){
+      const kalan = ls.slice(0,son).filter(Boolean);
+      if(row) row.h.push(kalan); else kalan.forEach(x=>once.push(x));
+      row = {saat:ls[son], h:[]}; rows.push(row);
+      return;
+    }
+    const dolu = ls.filter(Boolean);
+    if(row) row.h.push(dolu); else dolu.forEach(x=>once.push(x));
+  });
+  if(rows.length<2) return null;
+  // Tablodan sonra gelen yazılar ("Not: Uygulama saatleri yeşil ders kodu…") son satırın son hücresine
+  // yapışır; o hücre boşsa ders sanılırdı. "Not:" satırından sonrası atılır.
+  const sonSatir = rows[rows.length-1];
+  for(let ci=0; ci<sonSatir.h.length; ci++){
+    const li = sonSatir.h[ci].findIndex(l=>/^not\s*:/i.test(l));
+    if(li>=0){ sonSatir.h[ci] = sonSatir.h[ci].slice(0,li); sonSatir.h = sonSatir.h.slice(0,ci+1); break; }
+  }
+
+  // Sütun başlığı: tablodan önceki son ardışık gün adları ("Pazartesi … Cumartesi")
+  let gunler=[];
+  for(let i=once.length-1;i>=0;i--){
+    const d = pureDay(once[i]);
+    if(d>=0) gunler.unshift(d); else if(gunler.length) break;
+  }
+  const baslikVar = gunler.length>=3;
+  if(!baslikVar) gunler=[0,1,2,3,4,5,6];
+  const hucre = (text,r,c)=>({text:text, rs:1, cs:1, r0:r, c0:c});
+  const m = [[hucre('Saat',0,0)].concat(gunler.map((d,i)=>hucre(DAY_NAMES[d],0,i+1)))];
+  rows.forEach((r,ri)=> m.push([hucre(r.saat,ri+1,0)].concat(r.h.map((h,i)=>hucre(h.join('\n'),ri+1,i+1)))));
+  const w = m.reduce((a,r)=>Math.max(a,r.length),0);
+  m.forEach((r,ri)=>{ for(let c=r.length;c<w;c++) r.push(hucre('',ri,c)); });
+  m.izgara = true;
+  // Günlerin doğru sütuna düşmesi için ders içeren her satırda gün sayısı kadar hücre olmalı.
+  // Birleştirilmiş (rowspan) hücrede sonraki satırlarda hücre eksik kalır; bazı tarayıcılar da
+  // içi blok olan hücrelerin arasına sekme koymaz. İkisinde de günler kayar: HTML'e güvenilir.
+  const say = {}; rows.forEach(r=>{ say[r.h.length] = (say[r.h.length]||0)+1; });
+  const n = +Object.keys(say).sort((a,b)=>say[b]-say[a])[0];
+  const dersli = r => r.h.some(h=>h.some(l=>kodSatiri(l)));
+  const son = rows[rows.length-1];
+  m.tutarli = (baslikVar ? n===gunler.length : n>=5 && n<=7) &&
+    rows.every(r=>r.h.length===n || (r===son && r.h.length>n) || !dersli(r));
+  return m;
+}
+
+/* Bir tablodan kaç ders saati çıktığı (HTML ile düz metin arasında seçim için) */
+function okunanDersSaati(matrix){
+  const sh = analyzeShape(matrix);
+  if(sh==='gun-panel') return panelToRows(matrix).length;
+  if(sh==='gun-sutun' || sh==='gun-satir') return gridToRows(matrix, sh).length;
+  return 0;
+}
+
+/* Pano verisini matrise çevirir: önce text/html, olmazsa düz metin.
+   Yeni haftalık ızgarada düz metin, ekranda görünenin birebir karşılığı olduğundan
+   sütunları tutarlıysa o kullanılır; HTML ise yedek aday olarak kalır. */
+function clipboardToMatrix(html, text){
+  let h = null;
+  if(html && /<t(able|r|d|h)\b/i.test(html)){
+    const t = tablesFromHtml(html);
+    if(t.length) h = {matrix:t[0], cands:t, source:'html'};
+  }
+  const izg = izgaraMetni(text);
+  if(izg){
+    const nT = okunanDersSaati(izg);
+    if(!h || (izg.tutarli && nT>0) || (nT>0 && okunanDersSaati(h.matrix)===0))
+      return {matrix:izg, cands:[izg], source:'text'};
+  }
+  if(h) return h;
+  const m = matrixFromText(text);
+  return {matrix:m, cands:[m], source:'text'};
+}
+
+/* ---------------------------------------------------- ızgara (gün x saat) modu */
+function analyzeShape(matrix){
+  if(!matrix.length) return 'bos';
+  if(matrix.izgara) return 'gun-sutun';
+  if(matrix.some(r=>r[0] && r[0].dayMark!==undefined)) return 'gun-panel';
+
+  const row0 = matrix[0]||[];
+  const dayInHeaderRow = row0.filter(c=>detectSingleDay(c.text)>=0).length;
+  const timeInFirstCol = matrix.filter(r=>r[0] && parseTimes(r[0].text,false).length).length;
+
+  // saf gün adı satırları + ilk sütunda saat = gün panelli takvim
+  const gunSatiri = matrix.filter(r=>{
+    const c = r.map(x=>x.text).filter(t=>t && t.trim());
+    return c.length>0 && c.length<=7 && c.every(t=>pureDay(t)>=0);
+  }).length;
+  const saatSatiri = matrix.filter(r=>r[0] && /^\s*\d{1,2}[:.]\d{2}/.test(r[0].text)).length;
+  // gün-sütun ızgarasında ilk sütundaki saatler hep artar; panelde her gün başında geri döner
+  let geriDonus = false, onceki = -1;
+  matrix.forEach(r=>{
+    if(!r[0]) return;
+    const t = parseTimes(r[0].text,false);
+    if(!t.length) { onceki=-1; return; }
+    if(onceki>=0 && t[0].start<onceki) geriDonus = true;
+    onceki = t[0].start;
+  });
+  if(gunSatiri>=1 && saatSatiri>=3 && (geriDonus || dayInHeaderRow<3)) return 'gun-panel';
+
+  if(dayInHeaderRow>=3 && timeInFirstCol>=2) return 'gun-sutun';
+
+  const dayInFirstCol = matrix.filter(r=>r[0] && detectSingleDay(r[0].text)>=0).length;
+  const timeInHeaderRow = row0.filter(c=>parseTimes(c.text,false).length).length;
+  if(dayInFirstCol>=3 && timeInHeaderRow>=2) return 'gun-satir';
+
+  return 'liste';
+}
+
+/* Ders kodu: 2-8 harf + isteğe bağlı ayraç + 2-4 rakam. JavaScript'teki \b kelime sınırı
+   Türkçe harfleri (Ç, İ, Ö, Ş, Ü, Ğ) harf saymadığı için "İŞL 101" hiç bulunamıyor,
+   "ÇEV 201" de "EV201" oluyordu. Sınır bu yüzden elle kuruluyor; lookbehind kullanılmıyor
+   çünkü eski iPhone'lardaki Safari onu tanımıyor ve bütün sayfa çalışmaz hale gelir.
+   Gruplar: 1 = önceki karakter, 2 = harfler, 3 = rakamlar. */
+const HARF = 'A-ZÇĞİÖŞÜ', KUCUK = 'a-zçğıöşü';
+const CODE_RE = new RegExp('(^|[^'+HARF+KUCUK+'0-9])(['+HARF+']{2,8})[ .\\-_]?(\\d{2,4}['+HARF+']?)(?![0-9'+HARF+KUCUK+'])');
+/* Hücrenin tamamı "KOD(ŞUBE)" mi? Burada tek harfli kodlara da izin var (kılavuzdaki "A 1001(1)");
+   serbest metinde buna izin vermek "D-303" gibi derslikleri ders kodu sandırırdı. */
+const KOD_HUCRE_RE = new RegExp('^(['+HARF+']{1,8})[ .\\-_]?(\\d{2,4}['+HARF+']?)\\s*(?:\\(\\s*([A-Za-z0-9]{1,3})\\s*\\))?$');
+/* Kontenjan sonda köşeli ya da normal parantez içinde: "AMFİ-04[90]", "ABC100(123)" */
+const KONT_RE = /^(.*?)\s*[\[(]\s*(\d{1,4})\s*[\])]\s*$/;
+
+function guessCodeFrom(text){
+  const m = String(text||'').toUpperCase().match(CODE_RE);
+  return m ? (m[2]+m[3]) : '';
+}
+function kodHucresi(text){
+  const m = clean(text).toUpperCase().match(KOD_HUCRE_RE);
+  return m ? {kod:m[1]+m[2], sube:(m[3]||'').toUpperCase()} : null;
+}
+function derslikHucresi(text){
+  const t = clean(text);
+  const m = t.match(KONT_RE);
+  return (m && m[1]) ? {derslik:clean(m[1]), kont:m[2]} : {derslik:t, kont:''};
+}
+function guessSubeFrom(text){
+  const t = String(text||'');
+  let m = t.match(/(?:şube|sube|grup|group|section|sec)\s*[:\-]?\s*([A-Za-z0-9]{1,3})\b/i);
+  if(m) return m[1].toUpperCase();
+  m = t.match(/\(\s*([A-J]|\d{1,2})\s*\)/);
+  if(m) return m[1].toUpperCase();
+  return '';
+}
+
+/* ------------------------------------------- hücre içindeki ders kartları */
+/* Yeni OBS ızgarasında bir hücrede alt alta birden çok ders kartı olabilir:
+     SENG 312(1)                 ← kod(şube), bazen ardından "Uzaktan eğitim" gibi bir etiket
+     Veri Madenciliği            ← ders adı
+     D-107(YENİ KAMPÜS)[80]      ← derslik[kontenjan]   (olmayabilir)
+     Prof.Dr. MELTEM ERYILMAZ    ← öğretim elemanı      (olmayabilir)
+   Kart başı, şubesi parantezde yazan kod satırıdır. Şube en fazla 2 karakter sayılır ki
+   "ABC100(123)" gibi kontenjanlı bir derslik yeni kart sanılmasın. */
+const KOD_SATIR_RE = new RegExp('^(['+HARF+']{1,8})[ .\\-_]?(\\d{2,4}['+HARF+']?)\\s*\\(\\s*([A-Za-z0-9]{1,2})\\s*\\)\\s*(.*)$');
+const ETIKET_RE = /^(uzaktan|online|cevrim ?ici|uygulama|teorik|lab|hibrit|karma|yuz ?yuze|senkron|asenkron)/;
+function kodSatiri(line){
+  const t = clean(line);
+  if(!t || t.length>80) return null;
+  const m = t.match(KOD_SATIR_RE);
+  if(!m) return null;
+  const ek = m[4].replace(/^[\s:|\-–—]+/,'').trim();
+  if(/\[\s*\d{1,4}\s*\]$/.test(ek)) return null;           // "B-101(2)[60]" bir derslik
+  return {kod:m[1]+m[2], sube:m[3].toUpperCase(), ek:ek.replace(/^\[(.*)\]$/,'$1').trim()};
+}
+/* Şubesiz kod satırı ("SENG 315"). Tek harfli olanlar alınmaz: "A101" çoğunlukla bir derslik. */
+function zayifKodSatiri(line){
+  const m = clean(line).match(KOD_HUCRE_RE);
+  return (m && !m[3] && m[1].length>=2) ? {kod:m[1]+m[2], sube:'', ek:''} : null;
+}
+const kontenjanli = l => KONT_RE.test(l) && l.length<=50;
+const derslikKelimesi = l => /(derslik|amfi|lab|salon|online|uzaktan|cevrimici|kampus|blok|atolye|studyo)/.test(deTr(l)) && l.length<=40;
+const derslikGibi = l => kontenjanli(l) || derslikKelimesi(l);
+const hocaGibi = l => TITLE_RE.test(deTr(l));
+
+function dersKartlari(lines){
+  const ls=[];
+  for(const ham of lines){
+    const l = clean(ham);
+    if(!l) continue;
+    if(/^not\s*:/i.test(l)) break;                        // sayfa altındaki açıklama
+    ls.push(l);
+  }
+  let kodlar = ls.map(kodSatiri);
+  if(!kodlar.some(Boolean)){
+    // Şubesi yazmayan ızgaralar: kod satırı, ardından ders adı gelmeli
+    kodlar = ls.map((l,i)=>{
+      const k = zayifKodSatiri(l), s = ls[i+1];
+      return (k && s && !zayifKodSatiri(s) && !derslikGibi(s) && !hocaGibi(s)) ? k : null;
+    });
+    if(!kodlar.some(Boolean)) return [];
+  }
+  const kartlar=[]; let k=null;
+  ls.forEach((l,i)=>{
+    if(kodlar[i]){ k={bas:kodlar[i], satir:[]}; kartlar.push(k); }
+    else if(k) k.satir.push(l);
+  });
+  return kartlar.map(kartiCoz);
+}
+function kartiCoz(k){
+  const rest = k.satir.slice();
+  let ad='', etiket='';
+  const ek = k.bas.ek;
+  if(ek){
+    // Koddan sonra gelen yazı ya bir etiket ("Uzaktan eğitim") ya da aynı satıra yazılmış ders adıdır
+    const s = rest[0]||'';
+    if(!ETIKET_RE.test(deTr(ek)) && (!s || derslikGibi(s) || hocaGibi(s))) ad = ek;
+    else etiket = ek;
+  }
+  if(!ad && rest.length) ad = rest.shift();
+  let derslik='', kont='', hoca='';
+  const kalan=[];
+  const derslikYaz = l=>{ const d=derslikHucresi(l); derslik=d.derslik; kont=d.kont; };
+  // Önce içerikten tanınanlar: kontenjanlı derslik, unvanlı öğretim elemanı, "Amfi/Lab/Online" gibi derslik
+  rest.forEach(l=>{
+    if(!derslik && kontenjanli(l)) derslikYaz(l);
+    else if(!hoca && hocaGibi(l)) hoca = l;
+    else if(!derslik && derslikKelimesi(l)) derslikYaz(l);
+    else kalan.push(l);
+  });
+  // Tanınmayanlar sırayla boş kalan alana: önce derslik, sonra öğretim elemanı
+  kalan.forEach(l=>{
+    if(!derslik) derslikYaz(l);
+    else if(!hoca && l.length<=60) hoca = l;
+  });
+  if(etiket){
+    const uzaktan = /uzaktan|online|cevrim/;
+    if(!(uzaktan.test(deTr(etiket)) && uzaktan.test(deTr(derslik)))) derslik = derslik ? derslik+' · '+etiket : etiket;
+  }
+  return {kod:k.bas.kod, sube:k.bas.sube, ad:ad, derslik:derslik, kont:kont, hoca:hoca};
+}
+
+/* Gün panelli takvim (Proliz OBS'nin "Bölüm Ders Programı" ekranı).
+   Her gün kendi tablosunda, sütunlar: Saat | Ders Kodu | Ders Adı | Derslik | Öğretim Elemanı.
+   Satırlar önce sütun başlığına göre (masaüstü HTML kopyasında vardır), başlık yoksa bu
+   standart sıraya göre okunur. İkisi de tutmazsa hücre içeriğinden tahmin edilir. */
+const PANEL_SIRA = {saat:0, kod:1, ad:2, derslik:3, hoca:4};
+
+/* Sütun başlığı satırı mı? Öyleyse rol → sütun indeksi döndürür. */
+function panelSutunlari(cells){
+  // Saat içeren satır veri satırıdır ("Real Time Systems" gibi bir ders adı başlık sanılmasın)
+  if(cells.some(c=>/^\s*\d{1,2}[:.]\d{2}/.test(c||''))) return null;
+  const r = {};
+  cells.forEach((c,i)=>{
+    const t = deTr(clean(c));
+    if(!t || t.length>30) return;
+    if(r.kod==null && /ders ?kodu|^kod|code/.test(t)) r.kod=i;
+    else if(r.ad==null && /ders ?adi|^ad$|^adi$|name|title|^course$/.test(t)) r.ad=i;
+    else if(r.derslik==null && /derslik|salon|mekan|room|^yer$|^sinif$|classroom/.test(t)) r.derslik=i;
+    else if(r.hoca==null && /ogretim|hoca|instructor|lecturer|akademisyen|teacher/.test(t)) r.hoca=i;
+    else if(r.saat==null && /saat|zaman|time|hour/.test(t)) r.saat=i;
+  });
+  return (r.saat!=null && r.kod!=null && r.ad!=null) ? r : null;
+}
+
+function parsePanelRow(cells, sutun){
+  const h = cells.map(clean);
+  const s = sutun || PANEL_SIRA;
+  const saatHucre = h[s.saat] || '';
+  const tt = /^\d{1,2}[:.]\d{2}/.test(saatHucre) ? parseTimes(saatHucre,false) : [];
+  const kh = tt.length ? kodHucresi(h[s.kod]) : null;
+  if(tt.length && kh){
+    let dI = s.derslik, hI = s.hoca;
+    // Başlık yoksa ve kontenjan "hoca" sütununda görünüyorsa bu iki sütun yer değiştirmiş demektir
+    if(!sutun && hI!=null && KONT_RE.test(h[hI]||'') && !KONT_RE.test(h[dI]||'')){ const x=dI; dI=hI; hI=x; }
+    const dk = dI!=null ? derslikHucresi(h[dI]||'') : {derslik:'', kont:''};
+    return {kod:kh.kod, sube:kh.sube, ad:h[s.ad]||'', bas:tt[0].start, bit:tt[0].end,
+            derslik:dk.derslik, kont:dk.kont, hoca:(hI!=null ? h[hI]||'' : '')};
+  }
+  return parsePanelRowTahmin(h);
+}
+
+/* Sütun düzeni bilinmiyorsa hücre içeriğinden tahmin eder. */
+function parsePanelRowTahmin(h){
+  const rest=[]; let time=null;
+  h.forEach(t=>{
+    if(!t) return;
+    if(!time && /^\d{1,2}[:.]\d{2}/.test(t)){
+      const tt=parseTimes(t,false);
+      if(tt.length){ time=tt[0]; return; }
+    }
+    rest.push(t);
+  });
+  if(!time) return null;
+
+  let derslik='', kont='', hoca='', kod='', sube='';
+  // 1) Ders kodu: önce hücrenin tamamı "KOD(ŞUBE)" olan ilk hücre. Satır sırasında kod dersliğin
+  //    önünde geldiği için "ABC100(123)" gibi bir derslik ders kodu sanılmaz.
+  let i = rest.findIndex(t=>!!kodHucresi(t));
+  if(i>=0){ const k=kodHucresi(rest[i]); kod=k.kod; sube=k.sube; rest.splice(i,1); }
+  else {
+    i = rest.findIndex(t=>CODE_RE.test(t.toUpperCase()));
+    if(i>=0){
+      const ham = rest[i];
+      kod = guessCodeFrom(ham);
+      const sm = ham.match(/\(\s*([A-Za-z0-9]{1,3})\s*\)/);
+      if(sm) sube = sm[1].toUpperCase();
+      const kalan = ham.replace(CODE_RE,'$1').replace(/\(\s*[A-Za-z0-9]{1,3}\s*\)/,'').trim();
+      rest.splice(i,1);
+      if(kalan.length>4) rest.push(kalan);
+    }
+  }
+  // 2) Derslik: sonunda [kontenjan] ya da (kontenjan) olan hücre
+  i = rest.findIndex(t=>KONT_RE.test(t) && t.length<=40);
+  if(i>=0){ const d=derslikHucresi(rest[i]); derslik=d.derslik; kont=d.kont; rest.splice(i,1); }
+  // 3) Öğretim elemanı: unvanından
+  i = rest.findIndex(t=>TITLE_RE.test(deTr(t)));
+  if(i>=0){ hoca = rest[i]; rest.splice(i,1); }
+  if(!derslik){
+    i = rest.findIndex(t=>/(derslik|amfi|lab|salon|online|uzaktan)/i.test(t) && t.length<=28);
+    if(i>=0){ derslik = rest[i]; rest.splice(i,1); }
+  }
+  // 4) Ders adı: kalanların en uzunu
+  rest.sort((a,b)=>b.length-a.length);
+  return {kod:kod, ad:rest[0]||'', sube:sube, bas:time.start, bit:time.end, derslik:derslik, kont:kont, hoca:hoca};
+}
+
+function panelToRows(matrix){
+  const out=[];
+  let gunler=[], gi=0, gun=-1, onceki=-1, basladi=false, sutun=null;
+  matrix.forEach(row=>{
+    if(row[0] && row[0].dayMark!==undefined){
+      gun=row[0].dayMark; gunler=[gun]; gi=0; onceki=-1; basladi=false; return;
+    }
+    const metin = row.map(c=>c.text);
+    const dolu = metin.filter(t=>t && t.trim());
+    if(dolu.length && dolu.length<=7 && dolu.every(t=>pureDay(t)>=0)){
+      gunler = dolu.map(pureDay); gi=0; gun=gunler[0]; onceki=-1; basladi=false; return;
+    }
+    const bas = panelSutunlari(metin);
+    if(bas){ sutun = bas; return; }
+    const rec = parsePanelRow(metin, sutun);
+    if(!rec) return;
+    // saat geriye döndüyse yan paneldeki güne geçilmiştir
+    if(basladi && rec.bas < onceki && gi+1 < gunler.length){ gi++; gun = gunler[gi]; }
+    onceki = rec.bas; basladi = true;
+    if(gun<0) return;
+    rec.gun = gun;
+    out.push(rec);
+  });
+  return out;
+}
+
+/* Aynı dersin ardışık ders saatlerini tek blokta birleştirir (09-09:50 + 10-10:50 → 09:00-10:50) */
+function mergeSchRows(rows){
+  const key = r => [r.kod||'', r.sube||'', r.gun, r.derslik||''].join('\u0001');
+  const gruplar = new Map();
+  rows.forEach(r=>{ const k=key(r); if(!gruplar.has(k)) gruplar.set(k,[]); gruplar.get(k).push(r); });
+  const out=[];
+  gruplar.forEach(list=>{
+    list.sort((a,b)=>a.bas-b.bas);
+    let cur=null;
+    list.forEach(r=>{
+      if(cur && r.bas>=0 && cur.bit>=0 && r.bas-cur.bit<=20 && r.bas>=cur.bas){
+        cur.bit = Math.max(cur.bit, r.bit);
+        // ilk saatte yazmayan bilgi (ör. öğretim elemanı) sonraki saatte yazıyorsa onu al
+        ['ad','hoca','kont'].forEach(f=>{ if(!cur[f] && r[f]) cur[f] = r[f]; });
+      } else { cur = Object.assign({},r); out.push(cur); }
+    });
+  });
+  out.sort((a,b)=> (a.gun-b.gun) || (a.bas-b.bas) || String(a.kod).localeCompare(String(b.kod),'tr'));
+  return out;
+}
+
+/* Izgara tablodan ders oturumları çıkarır */
+function gridToRows(matrix, shape){
+  const rows=[];
+  const seen=new Set();
+  const dayOf=[], timeOf=[];
+
+  if(shape==='gun-sutun'){
+    (matrix[0]||[]).forEach((c,i)=>{ dayOf[i]=detectSingleDay(c.text); });
+    matrix.forEach((r,i)=>{ const t=parseTimes(r[0]?r[0].text:'',false); timeOf[i]=t.length?t[0]:null; });
+  }else{
+    matrix.forEach((r,i)=>{ dayOf[i]=detectSingleDay(r[0]?r[0].text:''); });
+    (matrix[0]||[]).forEach((c,i)=>{ const t=parseTimes(c.text,false); timeOf[i]=t.length?t[0]:null; });
+  }
+
+  // Ders kartlı ızgarada (yeni OBS) kart içermeyen hücre ders değildir: boş hücre, tablonun altındaki
+  // "Not: …" yazısı, "Öğle arası" gibi. Onlardan ders üretilmez.
+  const kartModu = matrix.some((r,ri)=> ri>0 && r.some((c,ci)=> ci>0 && c && c.text && dersKartlari(c.text.split('\n')).length>0));
+
+  for(let r=0;r<matrix.length;r++){
+    for(let c=0;c<matrix[r].length;c++){
+      const cell=matrix[r][c];
+      if(!cell || !cell.text) continue;
+      const key=cell.r0+':'+cell.c0;
+      if(seen.has(key)) continue;
+      let day, t0, t1;
+      if(shape==='gun-sutun'){
+        if(cell.c0===0 || cell.r0===0) continue;
+        day = dayOf[cell.c0];
+        const a=timeOf[cell.r0], b=timeOf[cell.r0+cell.rs-1] || a;
+        if(!a) continue;
+        t0=a.start; t1=(b||a).end;
+      }else{
+        if(cell.c0===0 || cell.r0===0) continue;
+        day = dayOf[cell.r0];
+        const a=timeOf[cell.c0], b=timeOf[cell.c0+cell.cs-1] || a;
+        if(!a) continue;
+        t0=a.start; t1=(b||a).end;
+      }
+      if(day===undefined || day<0) continue;
+      seen.add(key);
+      // Hücrede kod(şube) satırıyla başlayan kartlar varsa her kart ayrı bir ders
+      const kartlar = dersKartlari(cell.text.split('\n'));
+      if(kartlar.length){
+        kartlar.forEach(k=> rows.push(Object.assign({}, k, {gun:day, bas:t0, bit:t1, akts:''})));
+        continue;
+      }
+      if(kartModu) continue;
+      // Kartsız eski tip ızgara: hücrede tek ders. "Not: …" gibi açıklama satırları ders değildir.
+      const lines = cell.text.split('\n').filter(l=>l.trim() && !/^\s*not\s*:/i.test(l));
+      if(!lines.length) continue;
+      const metin = lines.join('\n');
+      const kod = guessCodeFrom(metin);
+      let ad = lines.find(l=>l.replace(CODE_RE,'$1').trim().length>4) || lines[0] || '';
+      ad = ad.replace(CODE_RE,'$1').replace(/^[\s:.\-]+/,'').trim() || (lines[0]||'');
+      let derslik = (metin.match(/(?:derslik|salon|amfi|lab)[^\n]*/i)||[''])[0];
+      if(!derslik){
+        const cand = lines.slice(1).filter(l=>l.length<=18 && !/(prof|doç|doc|dr|öğr|ogr|arş|ars|okt)\.?/i.test(l) && /[A-Za-z0-9]/.test(l));
+        derslik = cand.length ? cand[cand.length-1] : '';
+      }
+      rows.push({
+        kod: kod || clean(lines[0]).slice(0,12),
+        ad: clean(ad).slice(0,90),
+        sube: guessSubeFrom(metin),
+        gun: day, bas: t0, bit: t1,
+        derslik: clean(derslik).slice(0,40),
+        hoca: clean(lines.filter(l=>/(prof|doç|doc|dr|öğr|ogr|arş|ars|okt)\.?/i.test(l))[0]||'').slice(0,50),
+        akts:''
+      });
+    }
+  }
+  return rows;
+}
+
+
+/* ------------------------------------------------------------------ durum */
+const state = {
+  cur: [],        // müfredat: {kod, ad, yariyil, tur:'Z'|'S', akts}
+  yariyil: 1,
+  take: [],       // alınacak ders kodları
+  schRows: [],    // program satırları: {kod, ad, sube, gun, bas, bit, derslik, hoca}
+  groups: [],     // {id, name, pick, members:[kod]}
+  blocked: [],    // {day, start, end}
+  eslesme: {},    // müfredat satırı kimliği -> ders programındaki ders anahtarı (elle onaylanan)
+  results: [],
+  ri: 0
+};
+const KEY = k => deTr(k).replace(/[^a-z0-9]/g,'');
+
+/* --------------------------------------------------- yapıştırma bileşeni */
+/*  config: {mount, roles:[{id,label,guess:[...]}], slotOption:bool, onRows(rows,shape)}  */
+function makeImporter(cfg){
+  const mount = cfg.mount;
+  mount.innerHTML='';
+
+  const hint = el('p',{class:'hint',style:'margin:0 0 8px',
+    text:'Sayfanın tamamını seçip kopyalaman yeterli, tablo içinden ayıklanır.'});
+  const box = el('div',{class:'paste', contenteditable:'true', spellcheck:'false',
+    'data-ph':'Buraya yapıştır', role:'textbox','aria-label':'Yapıştırma alanı'});
+  const okuBtn = el('button',{class:'btn primary', hidden:'hidden', onclick:()=>okuKutu()},
+    ['Kutudakini oku']);
+  const temizleBtn = el('button',{class:'btn sm', hidden:'hidden',
+    onclick:()=>{ box.innerHTML=''; kutuDegisti(); status.innerHTML=''; }},['Temizle']);
+  const okuSatir = el('div',{class:'row',style:'margin-top:8px'},[okuBtn, temizleBtn]);
+  const preview = el('div',{class:'onizleme', hidden:'hidden'});
+  const status = el('div',{class:'small muted',style:'margin-top:8px'});
+  const mapWrap = el('div',{style:'margin-top:12px'});
+  const actions = el('div',{class:'row',style:'margin-top:10px'});
+
+  mount.appendChild(hint);
+  mount.appendChild(box);
+  mount.appendChild(okuSatir);
+  mount.appendChild(preview);
+  mount.appendChild(status);
+  mount.appendChild(mapWrap);
+  mount.appendChild(actions);
+
+  function kutuDolu(){ return !!(box.textContent||'').trim(); }
+  function kutuDegisti(){ okuBtn.hidden = !kutuDolu(); temizleBtn.hidden = !kutuDolu(); }
+  function okuKutu(){
+    if(!kutuDolu()){
+      status.innerHTML = '<span class="badge bad">Kutu boş</span> Önce OBS sayfasından kopyalayıp buraya yapıştır.';
+      return;
+    }
+    ingest(box.innerHTML, box.innerText || box.textContent || '');
+  }
+
+  let matrix=null, shape='bos', headerRow=0, mapping={}, slotMode=false, cands=[], ci=0;
+  let silSecili = false;
+  // Kaynak (OBS sayfası) güncellendiğinde yeniden yapıştırınca eski satırların
+  // üstüne binmesin diye: "önce mevcutları sil" seçeneği.
+  function silKutusu(){
+    const n = cfg.mevcutSayisi ? cfg.mevcutSayisi() : 0;
+    if(!n){ silSecili=false; return null; }
+    const cb = el('input',{type:'checkbox', style:'accent-color:var(--accent);width:16px;height:16px',
+      onchange:e=>{ silSecili = e.target.checked; }});
+    if(silSecili) cb.checked = true;
+    return el('label',{class:'small',style:'display:flex;gap:7px;align-items:center;cursor:pointer'},
+      [cb, document.createTextNode('Önceki '+n+' satırı sil')]);
+  }
+
+  let otoOku = null;
+  box.addEventListener('paste', ev=>{
+    const cd = ev.clipboardData || window.clipboardData;
+    const html = cd ? cd.getData('text/html') : '';
+    const text = cd ? cd.getData('text/plain') : '';
+    if(html || text){            // masaüstü ve çoğu mobil tarayıcı
+      ev.preventDefault();
+      box.innerHTML='';
+      ingest(html, text);
+      return;
+    }
+    // Pano boş geldiyse içerik kutuya düşsün, aşağıdaki input olayı yakalar.
+  });
+  // Kutuya bir şey düşerse kısa bir beklemeden sonra kendiliğinden oku.
+  // Okuyamazsa “Kutudaki veriyi oku” düğmesi elde kalır.
+  box.addEventListener('input', ()=>{
+    kutuDegisti();
+    clearTimeout(otoOku);
+    otoOku = setTimeout(()=>{ if(kutuDolu()) okuKutu(); }, 400);
+  });
+  box.addEventListener('drop', ev=>{
+    ev.preventDefault();
+    const dt=ev.dataTransfer; if(!dt) return;
+    ingest(dt.getData('text/html'), dt.getData('text/plain'));
+  });
+  box.addEventListener('dragover', e=>e.preventDefault());
+
+  function ingest(html, text){
+    const res = clipboardToMatrix(html, text);
+    cands = res.cands || [res.matrix];
+    ci = 0;
+    matrix = res.matrix;
+    if(!matrix || !matrix.length){
+      status.innerHTML = '<span class="badge bad">Okunamadı</span> Tablo bulunamadı. Sayfayı seçip tekrar kopyala.';
+      return;
+    }
+    box.innerHTML=''; kutuDegisti();
+    shape = analyzeShape(matrix);
+    showPreview();
+    const shapeName = {'gun-sutun':'haftalık tablo','gun-satir':'haftalık tablo (günler satırda)',
+                       'gun-panel':'günlere ayrılmış tablo','liste':'liste tablosu'}[shape]||shape;
+    const enGenis = matrix.reduce((a,r)=>Math.max(a,r.length),0);
+    status.innerHTML = '<span class="badge ok">Okundu</span> '+shapeName+' · '+matrix.length+' satır, '+enGenis+
+      ' sütun · '+(res.source==='html'?'HTML':'düz metin');
+    if(cands.length>1){
+      const sw = el('select',{style:'margin-left:8px;padding:2px 4px;border:1px solid var(--line);border-radius:4px;background:#fff;font-size:.82rem',
+        onchange:e=>{ ci=+e.target.value; matrix=cands[ci]; shape=analyzeShape(matrix); showPreview(); buildMapping(); }});
+      cands.forEach((m,i)=> sw.appendChild(el('option',{value:String(i), selected:i===ci?'selected':null},
+        ['Tablo '+(i+1)+' ('+m.length+'×'+m[0].length+')'])));
+      status.appendChild(el('span',{class:'small muted',text:' Başka tablo:'}));
+      status.appendChild(sw);
+    }
+    buildMapping();
+  }
+
+  function showPreview(){
+    preview.hidden = false;
+    // Hücrede alt alta birden çok ders varsa ilkinin yanında kaç tane daha olduğu yazılır
+    const ozet = c=>{
+      const ls = c.text.split('\n');
+      const n = ls.filter(l=>kodSatiri(l)).length;
+      return ls[0] + (n>1 ? ' (+'+(n-1)+')' : '');
+    };
+    preview.textContent = matrix.slice(0,10).map(r=>r.map(ozet).join(' | ')).join('\n')
+      + (matrix.length>10 ? '\n… ('+matrix.length+' satır)' : '');
+  }
+
+  function buildMapping(){
+    mapWrap.innerHTML=''; actions.innerHTML='';
+
+    if(shape==='gun-panel' && cfg.allowGrid){
+      const on = panelToRows(matrix);
+      const gunler = Array.from(new Set(on.map(r=>r.gun))).sort().map(d=>DAY_SHORT[d]).join(', ');
+      mapWrap.appendChild(el('div',{class:'note',html:
+        on.length+' ders saati okundu, günler: '+(gunler||'yok')+'. '+
+        'Koddaki (1), (2) şube numarası olarak alınıyor.'}));
+      actions.appendChild(el('button',{class:'btn primary', onclick:()=>finish(panelToRows(matrix))},['Tabloyu ekle']));
+      actions.appendChild(el('button',{class:'btn', onclick:()=>{shape='liste';buildMapping();}},['Liste olarak oku']));
+      const sk1=silKutusu(); if(sk1) actions.appendChild(sk1);
+      return;
+    }
+
+    if(shape!=='liste' && cfg.allowGrid){
+      const on = gridToRows(matrix, shape);
+      const gunler = Array.from(new Set(on.map(r=>r.gun))).sort().map(d=>DAY_SHORT[d]).join(', ');
+      const subeli = on.filter(r=>r.sube).length;
+      const dersSayisi = new Set(on.map(r=>KEY(r.kod)).filter(Boolean)).size;
+      mapWrap.appendChild(el('div',{class:'note',html:
+        dersSayisi+' ders, '+on.length+' ders saati okundu, günler: '+(gunler||'yok')+'. '+
+        (on.length && subeli*2>=on.length
+          ? 'Koddaki (1), (2) şube numarası olarak alınıyor.'
+          : 'Tabloda şube yazmıyor. Bir dersin birden fazla şubesi varsa aşağıdaki listede Şube sütununu doldur.')}));
+      if(matrix.izgara && !matrix.tutarli){
+        mapWrap.appendChild(el('div',{class:'note warn',html:
+          'Bu kopyada günler birbirinden ayrılamadı, bazı dersler yanlış güne düşmüş olabilir. '+
+          'Bilgisayarda kopyalayıp tekrar dene ya da ekledikten sonra günleri kontrol et.'}));
+      }
+      actions.appendChild(el('button',{class:'btn primary', onclick:()=>commitGrid()},['Tabloyu ekle']));
+      actions.appendChild(el('button',{class:'btn', onclick:()=>{shape='liste';buildMapping();}},['Liste olarak oku']));
+      const sk2=silKutusu(); if(sk2) actions.appendChild(sk2);
+      return;
+    }
+
+    // başlık satırını tahmin et: rol tahmini en çok tutan ilk 3 satırdan biri
+    let best=0,bestScore=-1;
+    for(let r=0;r<Math.min(5,matrix.length);r++){
+      // "3. Yarıyıl" gibi tek hücrenin satıra yayıldığı ara başlıklar sütun başlığı değildir
+      if(distinctTexts(matrix[r])<3) continue;
+      let sc=0;
+      matrix[r].forEach(c=>{ if(guessRole(c.text)) sc++; });
+      if(sc>bestScore){bestScore=sc;best=r;}
+    }
+    headerRow = bestScore>0 ? best : -1;
+
+    const hdrSel = el('select',{style:'padding:3px 5px;border:1px solid var(--line);border-radius:4px;background:#fff',
+      onchange:e=>{ headerRow=+e.target.value; buildMapping(); }});
+    hdrSel.appendChild(el('option',{value:'-1'},['(başlık satırı yok)']));
+    for(let r=0;r<Math.min(6,matrix.length);r++){
+      hdrSel.appendChild(el('option',{value:String(r), selected: r===headerRow?'selected':null},
+        ['Satır '+(r+1)+': '+matrix[r].map(c=>c.text.split('\n')[0]).join(' | ').slice(0,70)]));
+    }
+    mapWrap.appendChild(el('div',{class:'row',style:'margin-bottom:10px'},[
+      el('span',{class:'small muted',text:'Başlık satırı:'}), hdrSel
+    ]));
+
+    const cols = matrix.reduce((a,r)=>Math.max(a,r.length),0);
+    const hdr = headerRow>=0 ? matrix[headerRow] : [];
+    mapping = {};
+    const grid = el('div',{class:'map-row',style:'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px'});
+    for(let c=0;c<cols;c++){
+      const label = hdr[c] ? hdr[c].text.split('\n')[0] : 'Sütun '+(c+1);
+      const sample = matrix.slice(headerRow+1, headerRow+4).map(r=>r[c]?r[c].text.split('\n')[0]:'').filter(Boolean)[0]||'';
+      const sel = el('select',{'data-col':String(c), onchange:e=>{ mapping[c]=e.target.value; }});
+      sel.appendChild(el('option',{value:''},['kullanma']));
+      cfg.roles.forEach(r=> sel.appendChild(el('option',{value:r.id},[r.label])));
+      const g = guessRole(hdr[c]?hdr[c].text:'') || guessRoleByContent(c);
+      if(g){ sel.value=g; mapping[c]=g; }
+      grid.appendChild(el('div',{},[
+        el('div',{class:'small',style:'font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap',text:label||('Sütun '+(c+1))}),
+        el('div',{class:'small muted',style:'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:3px',text:sample}),
+        sel
+      ]));
+    }
+    mapWrap.appendChild(el('div',{class:'small muted',style:'margin-bottom:6px',text:'Sütunları kontrol et:'}));
+    mapWrap.appendChild(grid);
+
+    if(cfg.slotOption){
+      const cb = el('input',{type:'checkbox', style:'accent-color:var(--accent)', onchange:e=>{slotMode=e.target.checked;}});
+      mapWrap.appendChild(el('label',{class:'small',style:'display:flex;gap:6px;align-items:center;margin-top:10px'},
+        [cb, document.createTextNode('Saat sütununda saat yerine ders saati numarası var (3-4 gibi)')]));
+    }
+    actions.appendChild(el('button',{class:'btn primary', onclick:()=>commitList()},['Tabloyu ekle']));
+    const sk3=silKutusu(); if(sk3) actions.appendChild(sk3);
+  }
+
+  function guessRole(text){
+    const t = deTr(text).replace(/[*():.,\/]+$/,'').replace(/^[*():.,\/]+/,'').trim();
+    if(!t) return '';
+    // 1) birebir eşleşme  2) baştan eşleşme  3) içinde geçme (kısa kelimeler hariç)
+    for(const r of cfg.roles) for(const g of r.guess) if(t===g) return r.id;
+    for(const r of cfg.roles) for(const g of r.guess) if(g.length>=3 && t.indexOf(g)===0) return r.id;
+    for(const r of cfg.roles) for(const g of r.guess) if(g.length>=5 && t.indexOf(g)>=0) return r.id;
+    return '';
+  }
+  function guessRoleByContent(c){
+    const vals = matrix.slice(headerRow+1, headerRow+9).map(r=>r[c]?r[c].text:'').filter(Boolean);
+    if(!vals.length) return '';
+    const has = f => vals.filter(f).length >= Math.max(1,Math.ceil(vals.length*0.5));
+    if(cfg.roles.some(r=>r.id==='gun') && has(v=>detectSingleDay(v)>=0)) return 'gun';
+    if(cfg.roles.some(r=>r.id==='saat') && has(v=>parseTimes(v,false).length>0)) return 'saat';
+    if(cfg.roles.some(r=>r.id==='kod') && has(v=>CODE_RE.test(v.toUpperCase()))) return 'kod';
+    return '';
+  }
+
+  function commitGrid(){
+    const rows = gridToRows(matrix, shape);
+    finish(rows);
+  }
+
+  function commitList(){
+    const colOf = id => { for(const c in mapping) if(mapping[c]===id) return +c; return -1; };
+    const cKod=colOf('kod'), cAd=colOf('ad'), cSube=colOf('sube'),
+          cGun=colOf('gun'), cSaat=colOf('saat'), cBit=colOf('saatBit'),
+          cGunSaat=colOf('gunsaat'), cDerslik=colOf('derslik'), cHoca=colOf('hoca'),
+          cYar=colOf('yariyil'), cTur=colOf('tur'), cAkts=colOf('akts');
+    const out=[];
+    let curYar = null;
+    for(let r=0; r<matrix.length; r++){
+      if(r===headerRow) continue;   // sütun başlığı satırının kendisi
+      const row = matrix[r];
+      const joined = row.map(c=>c.text).join(' ').trim();
+      if(!joined) continue;
+
+      // "3. Yarıyıl" gibi ara başlık satırları
+      const filled = distinctTexts(row);
+      const ym = joined.match(/(\d{1,2})\s*[.\-]?\s*(yariyil|yarıyıl|yariyıl|donem|dönem|sinif|sınıf|semester|yaril)/i);
+      if(filled<=2 && ym){ curYar = +ym[1]; continue; }
+      if(filled<=1) continue;
+
+      const get = i => (i>=0 && row[i]) ? row[i].text : '';
+      let kod = clean(get(cKod)) || guessCodeFrom(joined);
+      let ad  = clean(get(cAd));
+      if(!ad && cKod<0) ad = clean(joined).slice(0,80);
+      if(!kod && !ad) continue;
+      if(/^(toplam|total|genel|ders kodu)$/i.test(deTr(kod))) continue;
+
+      const base = {
+        kod: kod.toUpperCase().replace(/\s+/g,''),
+        ad: ad,
+        sube: clean(get(cSube)) || guessSubeFrom(joined),
+        derslik: clean(get(cDerslik)),
+        hoca: clean(get(cHoca)),
+        akts: clean(get(cAkts)).replace(',','.'),
+        kredi: clean(get(colOf('kredi'))),
+        adet:  clean(get(colOf('adet'))),
+        yariyil: cYar>=0 ? (parseInt(clean(get(cYar)),10)||curYar||null) : curYar,
+        tur: normTur(get(cTur))
+      };
+
+      if(cfg.kind==='schedule'){
+        let meetings=[];
+        if(cGunSaat>=0){
+          meetings = meetingsFromFreeText(get(cGunSaat), slotMode);
+        }else if(cGun>=0){
+          const days = detectDays(get(cGun));
+          let times = parseTimes(get(cSaat), slotMode);
+          if(cBit>=0){
+            const a=parseTimes(get(cSaat), slotMode), b=parseTimes(get(cBit), slotMode);
+            if(a.length&&b.length) times=[{start:a[0].start,end:b[0].end,idx:0}];
+          }
+          if(days.length && times.length){
+            if(days.length===times.length) days.forEach((d,i)=>meetings.push({gun:d.day,bas:times[i].start,bit:times[i].end}));
+            else days.forEach(d=>times.forEach(t=>meetings.push({gun:d.day,bas:t.start,bit:t.end})));
+          }else if(days.length){
+            days.forEach(d=>meetings.push({gun:d.day,bas:-1,bit:-1}));
+          }
+        }else{
+          meetings = meetingsFromFreeText(joined, slotMode);
+        }
+        if(!meetings.length) meetings=[{gun:-1,bas:-1,bit:-1}];
+        meetings.forEach(m=> out.push(Object.assign({},base,{gun:m.gun,bas:m.bas,bit:m.bit})));
+      }else{
+        out.push(base);
+      }
+    }
+    finish(out);
+  }
+
+  function finish(rows, zorla){
+    if(!rows.length){
+      status.innerHTML='<span class="badge bad">Ders bulunamadı</span> Sütunları kontrol et.';
+      return;
+    }
+    // Aynı dersler zaten farklı saatlerle yüklüyse üstüne eklemek saatleri birbirine karıştırır.
+    // Sessizce bozulmasın diye sor. Ders programında yalnızca gerçekten değişen dersler sayılır:
+    // başka bir sınıfın programı eklenirken ortak seçmeli/dil dersleri aynı saatlerle gelir, onlar sorun değil.
+    const kars = cfg.karsilastir ? cfg.karsilastir(rows) : null;
+    if(!zorla && !silSecili){
+      if(kars && kars.degisen.length){
+        const n = kars.degisen.length;
+        uyar(n+' dersin saati ya da dersliği önceki yüklemeden farklı: '+kars.degisen.slice(0,4).map(esc).join(', ')+(n>4?' ve diğerleri':'')+
+          '. Program güncellenmiş olabilir. Eskisinin üstüne eklersen bu dersler iki farklı saatle görünür.', rows);
+        return;
+      }
+      if(!kars && cfg.cakismaOrani){
+        const oran = cfg.cakismaOrani(rows);
+        if(oran >= 0.5){
+          uyar('Bu tablodaki derslerin %'+Math.round(oran*100)+' kadarı zaten yüklü. '+
+            'Müfredatı yeniden yüklüyorsan eskisini sil, yoksa dersler iki kez görünür.', rows);
+          return;
+        }
+      }
+    }
+    box.innerHTML=''; kutuDegisti();
+    preview.hidden = true; mapWrap.innerHTML=''; actions.innerHTML='';
+    const sil = silSecili; silSecili=false;
+    const sonuc = cfg.onRows(rows, shape, sil) || {};
+    const n = sonuc.eklenen!=null ? sonuc.eklenen : rows.length;
+    const ayni = (!sil && kars) ? kars.ayni : 0;
+    status.innerHTML='<span class="badge ok">'+n+' satır '+(sil?'yüklendi, eskiler silindi':'eklendi')+'</span> '+
+      (ayni ? ayni+' ders zaten vardı, tekrar eklenmedi. ' : '')+
+      'Başka tablo varsa onu da yapıştırabilirsin.';
+  }
+  function uyar(html, rows){
+    mapWrap.innerHTML=''; actions.innerHTML='';
+    mapWrap.appendChild(el('div',{class:'note warn',html:html}));
+    actions.appendChild(el('button',{class:'btn primary', onclick:()=>{ silSecili=true; finish(rows,true); }},
+      ['Eskisini silip yükle']));
+    actions.appendChild(el('button',{class:'btn', onclick:()=>finish(rows,true)},['Üstüne ekle']));
+  }
+}
+
+function distinctTexts(row){
+  return new Set((row||[]).map(c=>c && c.text).filter(Boolean)).size;
+}
+
+function normTur(v){
+  const t=deTr(v);
+  if(!t) return '';
+  if(/^z/.test(t)||t.indexOf('zorunlu')>=0||t.indexOf('compulsory')>=0||t.indexOf('required')>=0) return 'Z';
+  if(/^s/.test(t)||t.indexOf('secmeli')>=0||t.indexOf('elective')>=0||t.indexOf('optional')>=0) return 'S';
+  return '';
+}
+
+/* "Pazartesi 08:30-10:20, Çarşamba 13:00-13:50" gibi serbest metinden oturumlar */
+function meetingsFromFreeText(text, slotMode){
+  const days = detectDays(text);
+  const times = parseTimes(text, slotMode);
+  const out=[];
+  if(!days.length){ times.forEach(t=>out.push({gun:-1,bas:t.start,bit:t.end})); return out; }
+  if(!times.length){ days.forEach(d=>out.push({gun:d.day,bas:-1,bit:-1})); return out; }
+  times.forEach(t=>{
+    let d=days[0].day, best=-1;
+    days.forEach(x=>{ if(x.idx<=t.idx && x.idx>best){ best=x.idx; d=x.day; } });
+    if(best<0){ let mind=Infinity; days.forEach(x=>{ const dd=Math.abs(x.idx-t.idx); if(dd<mind){mind=dd;d=x.day;} }); }
+    out.push({gun:d, bas:t.start, bit:t.end});
+  });
+  // saati olmayan günleri de ekle
+  days.forEach(x=>{ if(!out.some(o=>o.gun===x.day)) out.push({gun:x.day,bas:-1,bit:-1}); });
+  return out;
+}
+
+
+/* -------------------------------------------------- düzenlenebilir tablo */
+function editTable(host, rows, cols, onChange, rowClass){
+  host.innerHTML='';
+  const wrap = el('div',{class:'tbl-wrap'});
+  const t = el('table',{class:'data'});
+  const thead = el('thead'); const tr = el('tr');
+  cols.forEach(c=> tr.appendChild(el('th',{style:c.w?('width:'+c.w):null},[c.label])));
+  tr.appendChild(el('th',{style:'width:34px'},['']));
+  thead.appendChild(tr); t.appendChild(thead);
+  const tb = el('tbody'); t.appendChild(tb);
+
+  rows.forEach((row,i)=>{
+    const r = el('tr', rowClass? {class: rowClass(row)} : null);
+    cols.forEach(c=>{
+      const td = el('td',{class:c.num?'num':null});
+      let inp;
+      if(c.type==='select'){
+        inp = el('select');
+        c.options.forEach(o=> inp.appendChild(el('option',{value:o[0]},[o[1]])));
+        inp.value = c.get(row);
+      }else{
+        inp = el('input',{type:'text', value:c.get(row)});
+      }
+      inp.addEventListener('change', ()=>{
+        c.set(row, inp.value);
+        onChange&&onChange();
+        if(c.rerender) editTable(host, rows, cols, onChange, rowClass);
+      });
+      td.appendChild(inp);
+      r.appendChild(td);
+    });
+    r.appendChild(el('td',{},[
+      el('button',{class:'btn sm danger', title:'Satırı sil', onclick:()=>{
+        rows.splice(rows.indexOf(row),1); editTable(host,rows,cols,onChange,rowClass); onChange&&onChange();
+      }},['×'])
+    ]));
+    tb.appendChild(r);
+  });
+  wrap.appendChild(t); host.appendChild(wrap);
+}
+
+
+function parseClock(v){
+  const m = String(v||'').trim().match(/^(\d{1,2})[:.]?(\d{2})?$/);
+  if(!m) return -1;
+  const h=+m[1], mi=+(m[2]||0);
+  if(h>23||mi>59) return -1;
+  return h*60+mi;
+}
+
+const DAY_OPTS = [['-1','—']].concat(DAY_NAMES.map((n,i)=>[String(i),n]));
+
+/* --- müfredat satırlarına kimlik + rol ata ---------------------------------
+   rol: 'ders'    normal ders
+        'grup'    seçmeli başlığı (örn. "ELEC 1 – Teknik Seçmeli Ders I")
+        'secenek' o başlığın altındaki seçeneklerden biri
+        'yok'     ders değil, kural/toplam satırı (örn. AKTS30)                */
+let CURID = 1;
+/* Yüklenen çalışmadaki satır kimliklerinin üstünden devam et; yoksa yeni satırlar
+   "c1", "c2"… alıp eski satırlarla (ve onların seçimleriyle) karışır. */
+function curIdSayaciniGuncelle(){
+  state.cur.forEach(r=>{
+    const m = /^c(\d+)$/.exec(r.id||'');
+    if(m && +m[1]>=CURID) CURID = +m[1]+1;
+  });
+}
+function isAktsRow(r){
+  const k = deTr(r.kod).replace(/[\s.]/g,''), a = deTr(r.ad).replace(/[\s.]/g,'');
+  const adMetni = deTr(clean(r.ad));
+  // "Toplam AKTS | 30" satırının kod sütunu boştur; kod tahmini oradan "AKTS30" üretir
+  if(/^(akts|ects)\d{0,3}$/.test(k) || /^(akts|ects)\d{0,3}$/.test(a)) return true;
+  // Toplam satırları: "Toplam AKTS", "Toplam Kredi", "Genel Toplam".
+  // "Genel Kimya" ya da "Toplam Kalite Yönetimi" gibi gerçek dersler yakalanmasın diye
+  // ya ardından AKTS/kredi gelmeli ya da satırın ders kodu olmamalı.
+  if(/^(toplam|total|genel toplam)\s*(akts|ects|kredi|credit|saat)/.test(adMetni)) return true;
+  if(!k && /^(toplam|total|genel toplam)\b/.test(adMetni)) return true;
+  return false;
+}
+function assignCurRoles(rows){
+  let openGroup = null, optCount = 0, prevYar = null, openKesin = false;
+  const kapat = ()=>{
+    // Adet sütunundan gelen gruplar seçeneksiz de olsa grup kalır (OBS'de satır kapalıyken
+    // seçenekler kopyaya girmez). Sadece isimden tahmin edilenler geri alınır.
+    if(openGroup && optCount===0 && !openKesin) openGroup.role='ders';
+    openGroup = null; optCount = 0; openKesin = false;
+  };
+  rows.forEach(r=>{
+    r.id = r.id || ('c'+(CURID++));
+    if(r.pick==null) r.pick = 1;
+    const ad = deTr(r.ad), kredi = (r.kredi||'').trim();
+    const kredisiz = !kredi || /^[-–—]+$/.test(kredi) || /^0\+0\+0$/.test(kredi);
+
+    // AKTS30 gibi kural satırları yarıyılın sonunu işaretler
+    if(isAktsRow(r)){ kapat(); r.role='yok'; return; }
+    // yarıyıl değiştiyse açık grup kapanır
+    if(r.yariyil!=null && prevYar!=null && r.yariyil!==prevYar) kapat();
+    if(r.yariyil!=null) prevYar=r.yariyil;
+
+    const adet = parseInt(String(r.adet||'').replace(/[^\d]/g,''),10);
+    if(adet>0 || (/secmeli|elective|havuz/.test(ad) && kredisiz)){
+      kapat();
+      r.role='grup'; r.pick = adet>0 ? adet : 1;
+      openGroup=r; optCount=0; openKesin = adet>0;
+      return;
+    }
+    if(openGroup){ r.role='secenek'; optCount++; return; }
+    r.role='ders';
+  });
+  kapat();
+}
+
+/* Sıraya göre grup + seçenek eşleştirmesi */
+function curGroups(){
+  const out=[]; let cg=null;
+  state.cur.forEach(r=>{
+    if(r.role==='grup'){ cg={row:r, members:[]}; out.push(cg); }
+    else if(r.role==='secenek'){ if(cg) cg.members.push(r); }
+    else if(r.role==='ders'){ cg=null; }
+  });
+  return out;
+}
+function curRow(id){ return state.cur.find(c=>c.id===id); }
+/* Ders adının normalize hâli — kodlar müfredat ile ders programı arasında farklı olabiliyor */
+function NKEY(ad){ return deTr(ad||'').replace(/[^a-z0-9]/g,''); }
+/* Ad benzerliği: karakter ikililerinin örtüşmesi (Dice katsayısı).
+   "İşletim Sistemleri" ile "İşletim Sistemleri Tasarımı ve İnşası" yüksek skor alır. */
+function ikililer(ad){
+  const t = NKEY(ad);
+  const set = new Set();
+  for(let i=0;i<t.length-1;i++) set.add(t.slice(i,i+2));
+  return set;
+}
+function adBenzerligi(a,b){
+  const A=ikililer(a), B=ikililer(b);
+  if(!A.size || !B.size) return 0;
+  let ortak=0; A.forEach(x=>{ if(B.has(x)) ortak++; });
+  return 2*ortak/(A.size+B.size);
+}
+/* Müfredat satırını ders programındaki derse bağlar:
+   1) elle onaylanmış eşleşme  2) ders kodu  3) birebir ders adı */
+function resolveRow(courses, r){
+  if(!r) return null;
+  let elle = state.eslesme && state.eslesme[r.id];
+  if(!elle && state.eslesme){
+    // Aynı ders müfredatta birden çok yerde geçebilir (ör. birkaç seçmeli grubunda);
+    // biri elle eşleştirildiyse hepsi için geçerli say.
+    const k = KEY(r.kod);
+    const ikiz = k ? state.cur.find(x=>x!==r && state.eslesme[x.id] && KEY(x.kod)===k) : null;
+    if(ikiz) elle = state.eslesme[ikiz.id];
+  }
+  if(elle && courses.has(elle)) return courses.get(elle);
+  return findCourse(courses, r.kod, r.ad);
+}
+/* Eşleşmeyen bir ders için benzerliğe göre sıralı aday listesi */
+function eslesmeOnerileri(courses, r){
+  const out=[];
+  courses.forEach(c=> out.push({c:c, skor: adBenzerligi(r.ad||'', c.ad||'')}));
+  out.sort((a,b)=> b.skor-a.skor);
+  return out.slice(0,25);
+}
+
+/* Önce ders koduyla, bulunamazsa birebir ders adıyla eşleştirir */
+function findCourse(courses, kod, ad){
+  const k = KEY(kod||'');
+  if(k && courses.has(k)) return courses.get(k);
+  const n = NKEY(ad);
+  if(n.length>=8 && courses.byName && courses.byName.has(n)){
+    const list = courses.byName.get(n);
+    if(list.length===1) return list[0];
+  }
+  return null;
+}
+function groupedIds(){
+  const set=new Set();
+  curGroups().forEach(g=> g.members.forEach(m=> set.add(m.id)));
+  return set;
+}
+
+const ROLE_OPTS = [['ders','Ders'],['grup','Seçmeli grubu'],['secenek','Grup seçeneği'],['yok','Yok say']];
+const CUR_COLS = [
+  {label:'Rol', w:'126px', type:'select', options:ROLE_OPTS, rerender:true,
+   get:r=>r.role||'ders', set:(r,v)=>r.role=v},
+  {label:'Ders kodu', w:'104px', get:r=>r.kod||'', set:(r,v)=>r.kod=v.toUpperCase().trim()},
+  {label:'Ders adı',  get:r=>r.ad||'', set:(r,v)=>r.ad=v},
+  {label:'Yarıyıl', w:'74px', num:true, get:r=>r.yariyil==null?'':String(r.yariyil), set:(r,v)=>r.yariyil=parseInt(v,10)||null},
+  {label:'Tür', w:'86px', type:'select', options:[['Z','Zorunlu'],['S','Seçmeli'],['','?']], get:r=>r.tur||'', set:(r,v)=>r.tur=v},
+  {label:'AKTS', w:'64px', num:true, get:r=>r.akts||'', set:(r,v)=>r.akts=v},
+  {label:'Kaç ders', w:'76px', num:true,
+   get:r=>r.role==='grup'?String(r.pick||1):'', set:(r,v)=>r.pick=Math.max(1,parseInt(v,10)||1)}
+];
+const CUR_ROWCLASS = r => r.role==='grup'?'grp' : r.role==='secenek'?'opt' : r.role==='yok'?'ign' : '';
+
+const SCH_COLS = [
+  {label:'Ders kodu', w:'104px', get:r=>r.kod||'', set:(r,v)=>r.kod=v.toUpperCase().trim()},
+  {label:'Ders adı', get:r=>r.ad||'', set:(r,v)=>r.ad=v},
+  {label:'Şube', w:'62px', get:r=>r.sube||'', set:(r,v)=>r.sube=v.trim().toUpperCase()},
+  {label:'Gün', w:'112px', type:'select', options:DAY_OPTS, get:r=>String(r.gun==null?-1:r.gun), set:(r,v)=>r.gun=parseInt(v,10)},
+  {label:'Başlangıç', w:'86px', num:true, get:r=>r.bas>=0?hhmm(r.bas):'', set:(r,v)=>{ r.bas=parseClock(v); }},
+  {label:'Bitiş', w:'86px', num:true, get:r=>r.bit>=0?hhmm(r.bit):'', set:(r,v)=>{ r.bit=parseClock(v); }},
+  {label:'Derslik', w:'118px', get:r=>r.derslik||'', set:(r,v)=>r.derslik=v},
+  {label:'Kont.', w:'58px', num:true, get:r=>r.kont||'', set:(r,v)=>r.kont=v},
+  {label:'Öğr. elemanı', w:'150px', get:r=>r.hoca||'', set:(r,v)=>r.hoca=v}
+];
+
+/* ---------------------------------------------------------- adım gezinme */
+function goStep(n){
+  $$('.step').forEach(s=> s.classList.toggle('is-active', s.dataset.step===String(n)));
+  $$('.railitem').forEach(b=> b.classList.toggle('is-active', b.dataset.step===String(n)));
+  window.scrollTo({top:0,behavior:'smooth'});
+  markDone();
+}
+function markDone(){
+  const done = {1: state.cur.length>0, 2: state.schRows.length>0, 3: state.take.length>0, 4: state.results.length>0, 5:false};
+  $$('.railitem').forEach(b=> b.classList.toggle('is-done', !!done[+b.dataset.step]));
+}
+$$('.railitem').forEach(b=> b.addEventListener('click', ()=>{
+  const n=+b.dataset.step;
+  if(n===3) renderPick();
+  if(n===4) renderStep4();
+  if(n===5) renderResults();
+  goStep(n);
+}));
+
+/* ------------------------------------------------------------- ADIM 1 */
+makeImporter({
+  mount: $('#curPaste'),
+  kind: 'curriculum',
+  allowGrid: false,
+  roles: [
+    {id:'kod',     label:'Ders kodu',     guess:['ders kodu','kod','code','dersin kodu']},
+    {id:'ad',      label:'Ders adı',      guess:['ders adi','dersin adi','ad','name','title','ders']},
+    {id:'yariyil', label:'Yarıyıl / Sınıf',guess:['yariyil','donem','sinif','semester','term','yil']},
+    {id:'kredi',   label:'T+U+K / Kredi',  guess:['t+u+k','t+u+l','t+u+u','kredi','tuk','ders saati','credit','teorik']},
+    {id:'adet',    label:'Grup ders adedi', guess:['grup ders adedi','ders adedi','grup adedi','adet','secilecek ders','secilecek']},
+    {id:'tur',     label:'Zorunlu / Seçmeli', guess:['tur','turu','z/s','zorunlu','secmeli','type','ders turu']},
+    {id:'akts',    label:'AKTS',          guess:['akts','ects']}
+  ],
+  mevcutSayisi: ()=>state.cur.length,
+  cakismaOrani(rows){
+    if(!state.cur.length) return 0;
+    const eski = new Set(state.cur.map(r=>KEY(r.kod)).filter(Boolean));
+    const yeni = Array.from(new Set(rows.map(r=>KEY(r.kod)).filter(Boolean)));
+    if(!yeni.length) return 0;
+    return yeni.filter(k=>eski.has(k)).length / yeni.length;
+  },
+  onRows(rows, shape, sil){
+    rows.forEach(r=>{ if(!r.tur) r.tur = /secmeli|elective/.test(deTr(r.ad))?'S':'Z'; });
+    assignCurRoles(rows);
+    if(sil){
+      state.cur = [];
+      state.groups = state.groups.filter(g=>g.id.indexOf('cur:')!==0);
+      state.eslesme = {};          // eski satırlara bağlıydı
+    }
+    state.cur = state.cur.concat(rows);
+    state.take = state.take.filter(id=>state.cur.some(c=>c.id===id));
+    renderCurReview();
+  }
+});
+function renderCurReview(){
+  $('#curReviewPanel').hidden = state.cur.length===0;
+  editTable($('#curReview'), state.cur, CUR_COLS, markDone, CUR_ROWCLASS);
+  const g = state.cur.filter(r=>r.role==='grup').length;
+  const o = state.cur.filter(r=>r.role==='secenek').length;
+  const y = state.cur.filter(r=>r.role==='yok').length;
+  const box = $('#curNotes');
+  box.innerHTML='';
+  if(g) box.appendChild(el('div',{class:'note',html:
+    g+' seçmeli grubu ve bunlara bağlı '+o+' seçenek bulundu. Yanlış gruplanan bir şey varsa Rol sütunundan düzeltebilirsin.'}));
+  if(y) box.appendChild(el('div',{class:'note warn',html:
+    y+' satır yok sayıldı. Bunlar Toplam AKTS gibi ders olmayan satırlar.'}));
+  markDone();
+}
+$('#curAddRow').addEventListener('click', ()=>{
+  state.cur.push({id:'c'+(CURID++), kod:'',ad:'',yariyil:state.yariyil,tur:'Z',akts:'',role:'ders',pick:1});
+  renderCurReview();
+});
+$('#curNext').addEventListener('click', ()=>{ goStep(2); });
+
+/* ------------------------------------------------------------- ADIM 2 */
+function renderPick(){
+  const sel = $('#selYariyil');
+  const yars = Array.from(new Set(state.cur.filter(c=>c.role!=='secenek'&&c.role!=='yok').map(c=>c.yariyil).filter(v=>v!=null))).sort((a,b)=>a-b);
+  const list = yars.length?yars:[1,2,3,4,5,6,7,8];
+  if(list.indexOf(state.yariyil)<0) state.yariyil = list[0];
+  sel.innerHTML='';
+  list.forEach(y=> sel.appendChild(el('option',{value:String(y)},[y+'. yarıyıl'])));
+  sel.value = String(state.yariyil);
+  sel.onchange = ()=>{ state.yariyil=+sel.value; drawPick(); };
+  $('#chkOnlyMatching').onchange = drawPick;
+  drawPick();
+}
+function takeThisTerm(){
+  state.cur.forEach(c=>{
+    if(c.yariyil===state.yariyil && (c.role==='ders'||c.role==='grup') && state.take.indexOf(c.id)<0)
+      state.take.push(c.id);
+  });
+  drawPick();
+}
+function pickTally(){
+  const courses = state.schRows.length ? buildCourses() : null;
+  const inGroup = grupUyeKeys(courses, true);
+  let n=0, akts=0;
+  state.take.forEach(id=>{
+    const r=curRow(id); if(!r) return;
+    const a=parseFloat(String(r.akts||'').replace(',','.'))||0;
+    if(r.role==='grup'){ n+=(r.pick||1); akts+=a*(r.pick||1); return; }
+    const c = courses ? resolveRow(courses, r) : null;
+    const k = c ? c.key : KEY(r.kod);
+    if(inGroup.has(k)) return;        // grup üzerinden zaten sayılıyor
+    n++; akts+=a;
+  });
+  const t=$('#pickTally');
+  t.innerHTML = 'Seçilen: <b>'+n+'</b> ders · <b>'+(Math.round(akts*10)/10)+'</b> AKTS'+(akts?' / 30':'');
+  if(akts && Math.abs(akts-30)>0.01) t.innerHTML += ' <span class="badge '+(akts>30?'bad':'s')+'">'+(akts>30?'30 üstü':'30 altı')+'</span>';
+}
+const acikGrup = new Set();   // hangi seçmeli grubunun listesi açık kalsın
+function drawPick(){
+  syncCurGroups();                       // gruplar bu adımda da hazır olsun
+  const host = $('#pickList');
+  host.innerHTML='';
+  const wrap = el('div',{class:'picklist'});
+  const onlyMatch = $('#chkOnlyMatching').checked;
+  const parity = state.yariyil % 2;
+  const groups = curGroups();
+  const memOf = row => { const g=groups.find(x=>x.row===row); return g?g.members:[]; };
+
+  // ders programı yüklüyse hangi seçeneğin bu dönem açıldığını gösterebiliriz
+  const courses = state.schRows.length ? buildCourses() : null;
+  const subeSayisi = row => {
+    if(!courses) return -1;
+    const c = row.id ? resolveRow(courses, row) : findCourse(courses, row.kod, row.ad);
+    return c ? c.sections.length : 0;
+  };
+
+  const grouped = groupedIds();
+  const byY = {};
+  state.cur.forEach(c=>{
+    if(c.role==='yok') return;
+    if(c.role==='secenek' && grouped.has(c.id)) return;
+    const y = c.yariyil==null?'?':c.yariyil;
+    (byY[y]=byY[y]||[]).push(c);
+  });
+
+  Object.keys(byY).sort((a,b)=>(+a||99)-(+b||99)).forEach(y=>{
+    if(onlyMatch && y!=='?' && (+y)%2!==parity) return;
+    const tag = y==='?'?'Yarıyılı belirsiz':(y+'. yarıyıl');
+    const extra = y==='?'?'':((+y)<state.yariyil?' · alttan':((+y)>state.yariyil?' · üstten':' · bu dönem'));
+    wrap.appendChild(el('div',{class:'pickgroup',text:tag+extra}));
+
+    byY[y].forEach(c=>{
+      const on = state.take.indexOf(c.id)>=0;
+      const cb = el('input',{type:'checkbox', checked:on?'checked':null});
+      cb.addEventListener('change',()=>{
+        const i=state.take.indexOf(c.id);
+        if(cb.checked && i<0) state.take.push(c.id);
+        if(!cb.checked && i>=0) state.take.splice(i,1);
+        pickTally(); markDone();
+      });
+
+      if(c.role!=='grup'){
+        const n = subeSayisi(c);
+        wrap.appendChild(el('label',{class:'pickrow'},[
+          cb,
+          el('span',{class:'code',text:c.kod}),
+          el('span',{class:'name',text:c.ad}),
+          el('span',{class:'badge '+(c.tur==='S'?'s':'z'),text:c.tur==='S'?'Seçmeli':'Zorunlu'}),
+          n>0 ? el('span',{class:'badge ok',text:n+' şube'}) : (n===0? el('span',{class:'badge bad',text:'saat yok'}) : null),
+          c.akts? el('span',{class:'small muted',text:c.akts+' AKTS'}) : null
+        ]));
+        return;
+      }
+
+      /* ---- seçmeli grubu ---- */
+      const g = state.groups.find(x=>x.id==='cur:'+c.id);
+      const cg = groups.find(x=>x.row===c);
+      const mufUye = cg ? cg.members : [];
+
+      // Müfredat kopyasında seçenekler varsa onları kullan; yoksa ders programında
+      // açılmış uygun dersleri aday olarak göster (eskiden bu 4. adıma gönderiliyordu).
+      let mem = mufUye, elleMod = false;
+      if(!mufUye.length && courses && g){
+        elleMod = true;
+        const zorunlu = new Set();
+        state.cur.filter(x=>x.role==='ders').forEach(x=>{
+          const cc = resolveRow(courses, x);
+          zorunlu.add(cc ? cc.key : KEY(x.kod));
+        });
+        // Aynı ders birden çok grupta aday olabilir (müfredatta da öyle);
+        // sadece zorunlu dersler listeden çıkarılır.
+        mem = [];
+        courses.forEach(cc=>{
+          if(zorunlu.has(cc.key)) return;
+          mem.push({kod:cc.kod, ad:cc.ad, aday:true,
+                    off: !g.members.some(k=>KEY(k)===KEY(cc.kod))});
+        });
+        mem.sort((x,y)=>x.kod.localeCompare(y.kod,'tr'));
+      }
+
+      const isaretle = ()=>{
+        if(!g) return;
+        if(elleMod){ g.members = mem.filter(m=>!m.off).map(m=>m.kod); g.auto=false; }
+        else { g.auto = true; syncCurGroups(); }
+      };
+
+      const rozetAcik  = el('span',{class:'badge'});
+      const rozetDurum = courses ? el('span',{class:'badge'}) : null;
+      rozetAcik.title = 'Aday ders sayısı. Hangisinin alınacağını program seçer.';
+      function rozetleriGuncelle(){
+        const acik = mem.filter(m=>!m.off);
+        rozetAcik.textContent = acik.length+' / '+mem.length+' aday';
+        if(!rozetDurum) return;
+        if(!acik.length){
+          rozetDurum.textContent = 'hiçbiri işaretli değil';
+          rozetDurum.className = 'badge bad';
+          return;
+        }
+        const acilan = acik.filter(m=>subeSayisi(m)>0).length;
+        rozetDurum.textContent = (acilan===acik.length ? 'hepsi bu dönem açık' : acilan+' tanesi bu dönem açık');
+        rozetDurum.className = 'badge '+(acilan? 'ok':'bad');
+      }
+
+      const sub = el('div', acikGrup.has(c.id)?{}:{hidden:'hidden'});
+      const toggle = el('button',{class:'btn sm', onclick:e=>{
+        e.preventDefault(); e.stopPropagation();
+        if(acikGrup.has(c.id)) acikGrup.delete(c.id); else acikGrup.add(c.id);
+        sub.hidden = !acikGrup.has(c.id);
+        toggle.textContent = sub.hidden?'Seçenekler':'Gizle';
+      }},[acikGrup.has(c.id)?'Gizle':'Seçenekler']);
+
+      const satir = el('div',{class:'pickrow is-grp'},[
+        el('label',{class:'grp-label'},[
+          cb, el('span',{class:'code',text:c.kod}), el('span',{class:'name',text:c.ad})
+        ]),
+        el('span',{class:'badge z',text:(c.pick||1)+' ders seçilecek'}),
+        mem.length ? rozetAcik
+                   : el('span',{class:'badge bad',text: courses? 'uygun ders açılmamış' : 'önce ders programını yapıştır'}),
+        mem.length ? rozetDurum : null,
+        (elleMod && !mem.some(m=>!m.off))
+          ? el('button',{class:'btn sm primary', onclick:e=>{
+              e.preventDefault(); e.stopPropagation();
+              mem.forEach(m=>m.off=false); isaretle();
+              acikGrup.add(c.id); drawPick();
+            }},['Hepsini aday yap'])
+          : null,
+        mem.length ? toggle : null
+      ]);
+      wrap.appendChild(satir);
+      if(!mem.length) return;
+
+      const topluBtn = (metin, fn) => el('button',{class:'btn sm', onclick:e=>{
+        e.preventDefault(); mem.forEach(fn); isaretle(); drawPick();
+      }},[metin]);
+      sub.appendChild(el('div',{class:'optaciklama'},[
+        el('span',{html: (elleMod
+          ? 'Müfredatta bu grubun seçenekleri yoktu, ders programında açılan dersler listelendi. '
+          : '')+
+          'İşaretli olanlar aday. Program bunlardan '+(c.pick||1)+' tanesini seçer ve her ihtimali ayrı bir alternatif olarak gösterir. '+
+          'Belli bir dersi istiyorsan Tümünü kaldır deyip sadece onu işaretle.'})
+      ]));
+      sub.appendChild(el('div',{class:'optbar'},[
+        el('span',{class:'small muted optlabel',text:'Bu gruptan:'}),
+        topluBtn('Tümünü işaretle', m=>m.off=false),
+        topluBtn('Tümünü kaldır',  m=>m.off=true),
+        (courses && !elleMod)? topluBtn('Sadece bu dönem açılanlar', m=>{ m.off = subeSayisi(m)<=0; }) : null
+      ]));
+
+      mem.forEach(m=>{
+        const n = subeSayisi(m);
+        const ob = el('input',{type:'checkbox', checked:m.off?null:'checked'});
+        const row = el('label',{class:'optrow'+(m.off?' is-off':'')},[
+          ob, el('span',{class:'code',text:m.kod}), el('span',{class:'name',text:m.ad}),
+          n>0 ? el('span',{class:'badge ok',text:n+' şube'}) : (n===0? el('span',{class:'badge bad',text:'saat yok'}) : null),
+          m.akts? el('span',{class:'small muted',text:m.akts+' AKTS'}):null
+        ]);
+        ob.addEventListener('change',()=>{
+          m.off = !ob.checked;
+          row.className='optrow'+(m.off?' is-off':'');
+          isaretle(); rozetleriGuncelle(); pickTally();
+        });
+        sub.appendChild(row);
+      });
+      rozetleriGuncelle();
+      wrap.appendChild(sub);
+    });
+  });
+
+  host.appendChild(wrap);
+  pickTally();
+  markDone();
+}
+$('#pickThisTerm').addEventListener('click', takeThisTerm);
+$('#pickClear').addEventListener('click', ()=>{ state.take=[]; drawPick(); });
+$('#pickNext').addEventListener('click', ()=>{ renderStep4(); goStep(4); });
+
+/* ------------------------------------------------------------- ADIM 3 */
+makeImporter({
+  mount: $('#schPaste'),
+  kind: 'schedule',
+  allowGrid: true,
+  slotOption: true,
+  roles: [
+    {id:'kod',     label:'Ders kodu',        guess:['ders kodu','kod','code','crn']},
+    {id:'ad',      label:'Ders adı',         guess:['ders adi','dersin adi','ad','name','ders']},
+    {id:'sube',    label:'Şube / Grup',      guess:['sube','grup','section','group','sb']},
+    {id:'gunsaat', label:'Gün + saat (tek sütunda)', guess:['gun ve saat','gun/saat','gun-saat','gun saat','zaman','time','ders saati','gun/saat/derslik']},
+    {id:'gun',     label:'Gün',              guess:['gun','day']},
+    {id:'saat',    label:'Saat (aralık veya başlangıç)', guess:['saat','saatler','saat araligi','baslangic','baslangic saati','start','hour']},
+    {id:'saatBit', label:'Bitiş saati',      guess:['bitis','end','son']},
+    {id:'derslik', label:'Derslik',          guess:['derslik','salon','amfi','mekan','room','yer','sinif/derslik','derslik/salon']},
+    {id:'hoca',    label:'Öğretim elemanı',  guess:['ogretim elemani','ogretim uyesi','ogr. uyesi','ogr uyesi','ogr.el.','hoca','instructor','elemani','akademisyen','ogretim']},
+    {id:'akts',    label:'AKTS',             guess:['akts','ects']}
+  ],
+  mevcutSayisi: ()=>state.schRows.length,
+  /* Hem eskide hem yenide olan şubeleri karşılaştırır: gün/saat/derslik aynıysa sorun yok (birleşince
+     tekrar etmez), farklıysa program güncellenmiştir. Başka bir sınıfın görünümünde aynı dersin yeni bir
+     şubesi gelmesi değişiklik sayılmaz, yalnızca eklenir. Yeni satırlar saat saat gelebildiği için önce birleştirilir. */
+  karsilastir(rows){
+    if(!state.schRows.length) return {degisen:[], ayni:0};
+    const imza = list=>{
+      const m = new Map();
+      list.forEach(r=>{
+        const k = KEY(r.kod); if(!k) return;
+        const ks = k+'|'+KEY(r.sube||'');
+        if(!m.has(ks)) m.set(ks, {kod:r.kod, k:k, s:[]});
+        m.get(ks).s.push([r.gun, r.bas, r.bit, KEY(r.derslik||'')].join('|'));
+      });
+      m.forEach(v=>{ v.s = Array.from(new Set(v.s)).sort().join(';'); });
+      return m;
+    };
+    const eski = imza(state.schRows), yeni = imza(mergeSchRows(rows));
+    const degisen = new Map(), ortak = new Set();
+    yeni.forEach((v,ks)=>{
+      const e = eski.get(ks);
+      if(!e) return;
+      if(e.s===v.s) ortak.add(v.k); else degisen.set(v.k, v.kod);
+    });
+    const ayni = Array.from(ortak).filter(k=>!degisen.has(k)).length;
+    return {degisen:Array.from(degisen.values()), ayni:ayni};
+  },
+  onRows(rows, shape, sil){
+    if(sil) state.schRows = [];
+    const once = state.schRows.length;
+    state.schRows = mergeSchRows(state.schRows.concat(rows));
+    renderSchReview();
+    return {eklenen: Math.max(0, state.schRows.length - once)};
+  }
+});
+function renderSchReview(){
+  $('#schReviewPanel').hidden = state.schRows.length===0;
+  const bad = state.schRows.filter(r=>r.gun<0||r.bas<0).length;
+  $('#schCount').textContent = state.schRows.length+' satır'+(bad?(' · '+bad+' eksik'):'');
+  $('#schCount').className = 'badge '+(bad?'bad':'ok');
+  editTable($('#schReview'), state.schRows, SCH_COLS, ()=>{ renderSchCount(); });
+  markDone();
+}
+function renderSchCount(){
+  const bad = state.schRows.filter(r=>r.gun<0||r.bas<0).length;
+  $('#schCount').textContent = state.schRows.length+' satır'+(bad?(' · '+bad+' eksik'):'');
+  $('#schCount').className = 'badge '+(bad?'bad':'ok');
+}
+$('#schAddRow').addEventListener('click', ()=>{
+  state.schRows.push({kod:'',ad:'',sube:'',gun:0,bas:8*60+30,bit:9*60+20,derslik:'',hoca:''});
+  renderSchReview();
+});
+$('#schClear').addEventListener('click', ()=>{
+  if(confirm('Bütün ders saatleri silinsin mi?')){ state.schRows=[]; renderSchReview(); }
+});
+$('#schNext').addEventListener('click', ()=>{ renderPick(); goStep(3); });
+
+
+/* ------------------------------------------------- şube/ders yapısı kurma */
+function buildCourses(){
+  const secs = new Map();
+  state.schRows.forEach(r=>{
+    if(!r.kod) return;
+    const key = KEY(r.kod), sube = (r.sube||'—').trim() || '—';
+    const id = key+'|'+sube;
+    let s = secs.get(id);
+    if(!s){ s={id:id, key:key, kod:r.kod, ad:r.ad||'', sube:sube, hoca:r.hoca||'', kont:r.kont||'', meetings:[]}; secs.set(id,s); }
+    if(!s.ad && r.ad) s.ad=r.ad;
+    if(!s.hoca && r.hoca) s.hoca=r.hoca;
+    if(!s.kont && r.kont) s.kont=r.kont;
+    if(r.gun>=0 && r.bas>=0 && r.bit>r.bas){
+      if(!s.meetings.some(m=>m.day===r.gun&&m.start===r.bas&&m.end===r.bit))
+        s.meetings.push({day:r.gun,start:r.bas,end:r.bit,derslik:r.derslik||''});
+    }
+  });
+  const courses = new Map();
+  secs.forEach(s=>{
+    let c = courses.get(s.key);
+    if(!c){ c={key:s.key, kod:s.kod, ad:s.ad, sections:[]}; courses.set(s.key,c); }
+    if(!c.ad && s.ad) c.ad=s.ad;
+    c.sections.push(s);
+  });
+  courses.forEach(c=> c.sections.sort((a,b)=> a.sube.localeCompare(b.sube,'tr')));
+  // ders adı indeksi
+  const byName = new Map();
+  courses.forEach(c=>{
+    const n = NKEY(c.ad);
+    if(n.length<8) return;
+    if(!byName.has(n)) byName.set(n,[]);
+    byName.get(n).push(c);
+  });
+  courses.byName = byName;
+  return courses;
+}
+function curByKey(key){ return state.cur.find(c=>KEY(c.kod)===key); }
+
+/* --------------------------------------------------------- kapalı saatler */
+const BT_START = 8*60, BT_STEP = 30;   // yalnızca eski kayıtları çevirmek için
+/* Izgara satırları ders programındaki gerçek ders başlangıçlarından türetilir.
+   Dersler 09:00, 10:00… diye başlıyorsa satırlar birer saatlik olur; 08:30, 09:25
+   gibi bir düzen varsa ona uyar. Program henüz yapıştırılmadıysa saat başı varsayılır. */
+function btRows(){
+  const set=new Set(); let ilk=Infinity, son=0;
+  state.schRows.forEach(r=>{
+    if(r.bas>=0){ set.add(r.bas); if(r.bas<ilk) ilk=r.bas; }
+    if(r.bit>son) son=r.bit;
+  });
+  if(!isFinite(ilk) || son<=ilk){ ilk=8*60; son=22*60; }
+  // Ders periyodunu, farklı başlangıçlar arasındaki en sık aralıktan tahmin et.
+  // (Ardışık saatler tek blokta birleştirildiği için aradaki başlangıçlar listede yoktur.)
+  const b = Array.from(set).sort((x,y)=>x-y);
+  const say = {};
+  for(let i=1;i<b.length;i++){ const f=b[i]-b[i-1]; if(f>=30 && f<=180) say[f]=(say[f]||0)+1; }
+  let per=60, enCok=0;
+  Object.keys(say).forEach(f=>{ if(say[f]>enCok){ enCok=say[f]; per=+f; } });
+  const rows=[];
+  for(let t=ilk; t<son; t+=per) rows.push({s:t, e:t+per});
+  return rows.length ? rows : [{s:8*60, e:9*60}];
+}
+function blockedRanges(){
+  const gun={};
+  state.blocked.forEach(x=>{ (gun[x.d]=gun[x.d]||[]).push(x); });
+  const out=[];
+  Object.keys(gun).forEach(d=>{
+    const l=gun[d].slice().sort((a,b)=>a.s-b.s);
+    let cur=null;
+    l.forEach(x=>{
+      if(cur && x.s<=cur.end){ cur.end=Math.max(cur.end,x.e); }
+      else { cur={day:+d, start:x.s, end:x.e}; out.push(cur); }
+    });
+  });
+  return out;
+}
+function bloklu(d,r){ return state.blocked.some(x=>x.d===d && x.s<r.e && x.e>r.s); }
+let btBirak = null;
+document.addEventListener('mouseup', ()=>{ if(btBirak) btBirak(); });
+function drawBlockGrid(){
+  const host = $('#blockGrid'); host.innerHTML='';
+  const rows = btRows();
+  const t = el('table');
+  const hr = el('tr');
+  hr.appendChild(el('th',{},['']));
+  for(let d=0;d<7;d++) hr.appendChild(el('th',{},[DAY_SHORT[d]]));
+  t.appendChild(el('thead',{},[hr]));
+  const tb = el('tbody');
+  const hucreler = {};
+  let dragging=false, mode=true;
+
+  function uygula(id, on){
+    const h = hucreler[id]; if(!h) return;
+    state.blocked = state.blocked.filter(x=>!(x.d===h.d && x.s<h.r.e && x.e>h.r.s));
+    if(on) state.blocked.push({d:h.d, s:h.r.s, e:h.r.e});
+    h.td.className = on?'on':'';
+  }
+
+  rows.forEach((r,i)=>{
+    const tr=el('tr');
+    tr.appendChild(el('td',{class:'h'},[
+      el('span',{class:'sa-uzun',text:hhmm(r.s)+'–'+hhmm(r.e)}),
+      el('span',{class:'sa-kisa',text:hhmm(r.s)})
+    ]));
+    for(let d=0;d<7;d++){
+      const id = d+'-'+i;
+      const td=el('td',{class: bloklu(d,r)?'on':'', 'data-bt':id});
+      hucreler[id] = {td:td, d:d, r:r};
+      td.addEventListener('mousedown', e=>{ e.preventDefault(); dragging=true; mode=!bloklu(d,r); uygula(id,mode); });
+      td.addEventListener('mouseenter', ()=>{ if(dragging) uygula(id,mode); });
+      // dokunmatik: parmakla sürükleyerek boyama
+      td.addEventListener('touchstart', e=>{
+        e.preventDefault(); dragging=true; mode=!bloklu(d,r); uygula(id,mode);
+      }, {passive:false});
+      tr.appendChild(td);
+    }
+    tb.appendChild(tr);
+  });
+
+  t.addEventListener('touchmove', e=>{
+    if(!dragging) return;
+    e.preventDefault();
+    const p = e.touches[0];
+    const hedef = document.elementFromPoint(p.clientX, p.clientY);
+    const id = hedef && hedef.getAttribute && hedef.getAttribute('data-bt');
+    if(id) uygula(id, mode);
+  }, {passive:false});
+  const bitir = ()=>{ dragging=false; };
+  t.addEventListener('touchend', bitir);
+  t.addEventListener('touchcancel', bitir);
+  btBirak = bitir;
+
+  t.appendChild(tb); host.appendChild(t);
+}
+$('#blockClear').addEventListener('click', ()=>{ state.blocked=[]; drawBlockGrid(); });
+
+/* ------------------------------------------------------------- ADIM 4 */
+function syncCurGroups(){
+  const cgs = curGroups();
+  cgs.forEach(g=>{
+    const gid = 'cur:'+g.row.id;
+    const ad  = (g.row.kod? g.row.kod+' ':'')+(g.row.ad||'Seçmeli grubu');
+    const members = g.members.filter(m=>!m.off).map(m=>m.kod).filter(Boolean);
+    let ex = state.groups.find(x=>x.id===gid);
+    if(!ex){ state.groups.push({id:gid, name:ad, pick:g.row.pick||1, members:members, auto:true}); }
+    else {
+      ex.name=ad; ex.pick=g.row.pick||ex.pick;
+      // Müfredatta seçenek yoksa (satır kapalı kopyalanmış) elde/ders programından
+      // doldurulan listeyi ezme.
+      if(ex.auto && members.length) ex.members=members;
+    }
+  });
+  state.groups = state.groups.filter(x=> x.id.indexOf('cur:')!==0 || cgs.some(g=>'cur:'+g.row.id===x.id));
+}
+
+function matchStats(courses){
+  let bulunan=0, kodFarki=0; const eksik=[], zayifGrup=[];
+  state.take.forEach(id=>{
+    const r=curRow(id); if(!r) return;
+    if(r.role==='grup'){
+      const g=state.groups.find(x=>x.id==='cur:'+r.id);
+      const acik = g ? grupDersleri(courses, g).length : 0;
+      if(acik < (r.pick||1)) zayifGrup.push({row:r, acik:acik});
+      return;
+    }
+    const c=resolveRow(courses, r);
+    if(c){ bulunan++; if(KEY(r.kod)!==c.key) kodFarki++; }
+    else eksik.push(r);
+  });
+  return {bulunan:bulunan, kodFarki:kodFarki, eksik:eksik, zayifGrup:zayifGrup};
+}
+
+let ileriAcik = false;
+function renderStep4(){
+  syncCurGroups();
+  const courses = buildCourses();
+  renderMatch(courses);
+  drawBlockGrid();
+
+  const st = matchStats(courses);
+  const sorun = st.eksik.length + st.zayifGrup.length;
+  if(sorun) ileriAcik = true;                    // bir sıkıntı varsa kendiliğinden aç
+
+  const box = $('#durumOzet'); box.innerHTML='';
+  const satir = el('div',{class:'row'});
+  const rozet = el('span',{class:'badge '+(sorun?'bad':'ok'), text: sorun? (sorun+' şeye bakman lazım') : 'Sorun yok'});
+  const parts=[];
+  parts.push(st.bulunan+' ders programda bulundu');
+  if(st.kodFarki) parts.push(st.kodFarki+' tanesi adından eşleşti');
+  st.eksik.forEach(r=> parts.push(r.kod+' programda yok'));
+  st.zayifGrup.forEach(z=> parts.push((z.row.kod||z.row.ad)+' için '+z.acik+' ders açık, '+(z.row.pick||1)+' gerekiyor'));
+  const ac = el('button',{class:'btn sm', onclick:()=>{
+    ileriAcik=!ileriAcik;
+    $('#ileriPanel').hidden=!ileriAcik;
+    ac.textContent = ileriAcik?'Ayrıntıları gizle':'Ayrıntıları göster';
+  }},[ileriAcik?'Ayrıntıları gizle':'Ayrıntıları göster']);
+  satir.appendChild(rozet);
+  satir.appendChild(el('span',{class:'small',style:'flex:1;min-width:0',text:parts.join(' · ')}));
+  satir.appendChild(ac);
+  box.appendChild(satir);
+  $('#ileriPanel').hidden = !ileriAcik;
+
+  markDone();
+}
+
+function renderMatch(courses){
+  const host=$('#matchReport'); host.innerHTML='';
+  const inGroup = grupUyeKeys(courses, true);    // işaretli grupların adayları
+  const tumGrup = grupUyeKeys(courses, false);   // müfredattaki bütün grupların adayları
+
+  const found=[], missing=[], grupSatiri=[], cift=[];
+  state.take.forEach(id=>{
+    const r = curRow(id); if(!r) return;
+    if(r.role==='grup'){ grupSatiri.push(r); return; }
+    const c = resolveRow(courses, r);
+    if(!c){ missing.push(r); return; }
+    // Bir seçmeli grubunun adayıysa grup başlığının altında gösterilir;
+    // burada tekrar listelenmesi çift seçim izlenimi veriyordu.
+    if(inGroup.has(c.key)) cift.push({row:r, c:c});
+    else found.push({row:r, c:c});
+  });
+
+  const takenKeys = new Set();
+  state.take.forEach(id=>{
+    const r=curRow(id); if(!r||r.role==='grup') return;
+    const c = resolveRow(courses, r);
+    takenKeys.add(c ? c.key : KEY(r.kod));
+  });
+  // Bir ders herhangi bir seçmeli grubunun adayıysa müfredatında zaten var demektir;
+  // grup işaretli olmasa bile "listende yok" diye sunup tek tek eklettirmek yanlış.
+  const extra=[];
+  courses.forEach((c,k)=>{ if(!takenKeys.has(k) && !tumGrup.has(k)) extra.push(c); });
+
+  const ul=el('div',{class:'picklist'});
+
+  ul.appendChild(el('div',{class:'pickgroup',text:'Programda bulunan dersler ('+found.length+')'}));
+  if(!found.length) ul.appendChild(el('div',{class:'pickrow muted'},[el('span',{class:'name',text:'Henüz eşleşen ders yok.'})]));
+  let kodFarki = 0;
+  found.forEach(f=>{
+    const adIle = KEY(f.row.kod)!==f.c.key;
+    const elle  = !!(state.eslesme && state.eslesme[f.row.id]);
+    if(adIle) kodFarki++;
+    ul.appendChild(el('div',{class:'pickrow'},[
+      el('span',{class:'code',text:f.c.kod}),
+      el('span',{class:'name',text:f.c.ad||f.row.ad}),
+      el('span',{class:'badge ok',text:f.c.sections.length+' şube'}),
+      adIle ? el('span',{class:'badge s',title: elle
+            ? 'Bu eşleşmeyi sen yaptın. Kayıtta soldaki kod geçerli.'
+            : 'Adı aynı olduğu için eşleştirildi. Kayıtta soldaki kod geçerli.',
+          text:(elle?'elle eşleştirildi · ':'')+'müfredatta '+f.row.kod}) : null,
+      elle ? el('button',{class:'btn sm', title:'Eşleştirmeyi geri al', onclick:()=>{
+          delete state.eslesme[f.row.id]; renderStep4(); renderPick();
+        }},['×']) : null,
+      el('span',{class:'small muted',text:hocalarOf(f.c)})
+    ]));
+  });
+
+  grupSatiri.forEach(r=>{
+    const g = state.groups.find(x=>x.id==='cur:'+r.id);
+    const mem = g? g.members : [];
+    const acikDersler = g ? grupDersleri(courses, g) : [];
+    const acik = mem.filter(m=>!!grupUyeCourse(courses,m));
+    ul.appendChild(el('div',{class:'pickgroup',text:(r.kod?r.kod+' ':'')+r.ad+' · '+(r.pick||1)+' ders seçilecek'}));
+    if(!acik.length){
+      ul.appendChild(el('div',{class:'pickrow'},[
+        el('span',{class:'name',text:'Bu gruptan bu dönem açılan ders yok.'}),
+        el('span',{class:'badge bad',text:'0 seçenek'})]));
+    }
+    acikDersler.forEach(c=>{
+      ul.appendChild(el('div',{class:'pickrow'},[
+        el('span',{class:'code',text:c.kod}),
+        el('span',{class:'name',text:c.ad}),
+        el('span',{class:'badge ok',text:c.sections.length+' şube'}),
+        el('span',{class:'small muted',text:hocalarOf(c)})
+      ]));
+    });
+    const kapali = mem.length-acik.length;
+    if(kapali>0) ul.appendChild(el('div',{class:'pickrow muted'},[
+      el('span',{class:'name',text:kapali+' seçenek bu dönem açılmamış.'})]));
+  });
+
+  if(missing.length){
+    ul.appendChild(el('div',{class:'pickgroup',text:'Programda bulunamayan ('+missing.length+')'}));
+    missing.forEach(r=>{
+      ul.appendChild(el('div',{class:'pickrow'},[
+        el('span',{class:'code',text:r.kod}),
+        el('span',{class:'name',text:r.ad||''}),
+        el('span',{class:'badge bad',text:'saat yok'}),
+        el('button',{class:'btn sm', onclick:()=>{
+          const i=state.take.indexOf(r.id); if(i>=0) state.take.splice(i,1); renderStep4();
+        }},['Listeden çıkar'])
+      ]));
+      // Kodu ve adı değişmiş olabilir: ders programındaki en benzer dersleri öner.
+      const oneri = eslesmeOnerileri(courses, r);
+      if(!oneri.length) return;
+      const iyi = oneri[0].skor >= 0.45;
+      const sel = el('select',{class:'optsec'});
+      oneri.forEach(o=> sel.appendChild(el('option',{value:o.c.key},
+        [o.c.kod+' · '+(o.c.ad||'').slice(0,46)+'  (%'+Math.round(o.skor*100)+' benzer)'])));
+      ul.appendChild(el('div',{class:'optbar'},[
+        el('span',{class:'small muted optlabel',
+          text: iyi ? 'Bu ders olabilir mi?' : 'Programdaki karşılığını seç:'}),
+        sel,
+        el('button',{class:'btn sm primary', onclick:()=>{
+          state.eslesme[r.id] = sel.value;
+          renderStep4(); renderPick();
+        }},['Eşleştir'])
+      ]));
+    });
+  }
+  if(extra.length){
+    ul.appendChild(el('div',{class:'pickgroup',text:'Programda olup listende olmayan ('+extra.length+')'}));
+    extra.slice(0,60).forEach(c=> ul.appendChild(el('div',{class:'pickrow'},[
+      el('span',{class:'code',text:c.kod}),
+      el('span',{class:'name',text:c.ad}),
+      el('span',{class:'badge',text:c.sections.length+' şube'}),
+      el('button',{class:'btn sm', onclick:()=>{
+        let r = state.cur.find(x=>KEY(x.kod)===c.key);
+        if(!r){ r={id:'c'+(CURID++), kod:c.kod, ad:c.ad, yariyil:state.yariyil, tur:'S', akts:'', role:'ders', pick:1}; state.cur.push(r); }
+        if(state.take.indexOf(r.id)<0) state.take.push(r.id);
+        renderStep4();
+      }},['Listeme ekle'])
+    ])));
+  }
+  host.appendChild(ul);
+
+  if(cift.length){
+    host.appendChild(el('div',{class:'note warn'},[
+      el('span',{html:'Şu dersler hem ayrıca seçilmiş hem de bir seçmeli grubunda aday: '+
+        esc(cift.map(x=>x.c.kod).join(', '))+'. Grup üzerinden sayılıyorlar, ayrı seçim sadece '+
+        '3. adımdaki AKTS toplamını yanlış gösteriyor.'}),
+      el('button',{class:'btn sm',style:'margin-left:8px',onclick:()=>{
+        cift.forEach(x=>{ const i=state.take.indexOf(x.row.id); if(i>=0) state.take.splice(i,1); });
+        renderStep4(); renderPick();
+      }},['Ayrı seçimi kaldır'])
+    ]));
+  }
+  if(kodFarki){
+    host.appendChild(el('div',{class:'note',html:
+      kodFarki+' dersin müfredattaki kodu ders programındakinden farklı. Kayıtta ders programındaki kod geçerli, '+
+      'sonuçlarda da o yazıyor. Müfredattaki kodu satırın yanındaki etikette görebilirsin.'}));
+  }
+  if(missing.length){
+    host.appendChild(el('div',{class:'note warn',html:
+      'Programda bulunamayan dersler hesaba katılmıyor. Bu dönem açılmamış olabilirler ya da o sınıfın programını henüz yapıştırmamış olabilirsin.'}));
+  }
+}
+/* Bir seçmeli grubunun üyelerini ders anahtarına çevirir.
+   sadeceAktif=true ise yalnızca 3. adımda işaretlenmiş gruplar sayılır. */
+function grupUyeKeys(courses, sadeceAktif){
+  const set = new Set();
+  state.groups.forEach(g=>{
+    if(sadeceAktif && g.id.indexOf('cur:')===0 && state.take.indexOf(g.id.slice(4))<0) return;
+    g.members.forEach(m=>{
+      const c = courses ? grupUyeCourse(courses, m) : null;
+      set.add(c ? c.key : KEY(m));
+    });
+  });
+  return set;
+}
+/* Bir grubun üyelerini ders programındaki derslere çevirir; aynı derse çıkanları tekilleştirir. */
+function grupDersleri(courses, g){
+  const goruldu = new Set(), out = [];
+  g.members.forEach(m=>{
+    const c = grupUyeCourse(courses, m);
+    if(c && !goruldu.has(c.key)){ goruldu.add(c.key); out.push(c); }
+  });
+  return out;
+}
+function grupUyeCourse(courses, kod){
+  const row = state.cur.find(x=>KEY(x.kod)===KEY(kod));
+  if(row) return resolveRow(courses, row);
+  return findCourse(courses, kod, '');
+}
+/* Bir şubenin AKTS'si: önce müfredattaki eşi (kod ya da ad), olmazsa bağlı olduğu seçmeli grubunun başlığı */
+/* Bu şubenin müfredattaki karşılığının kodu farklıysa onu döndürür (bilgi amaçlı) */
+/* Bir şubenin müfredattaki satırı: elle eşleşme → kod → birebir ad */
+function mufredatSatiri(sc){
+  const elleId = Object.keys(state.eslesme||{}).find(id=>state.eslesme[id]===sc.key);
+  if(elleId){ const r=curRow(elleId); if(r) return r; }
+  let r = state.cur.find(x=>KEY(x.kod)===sc.key);
+  if(r) return r;
+  const n = NKEY(sc.ad);
+  if(n.length>=8) r = state.cur.find(x=>NKEY(x.ad)===n);
+  return r || null;
+}
+function mufredatKodu(sc){
+  const r = mufredatSatiri(sc);
+  return (r && KEY(r.kod)!==sc.key) ? r.kod : '';
+}
+function aktsOfSection(sc){
+  const say = v => parseFloat(String(v||'').replace(',','.'))||0;
+  const r = mufredatSatiri(sc);
+  if(r && say(r.akts)) return say(r.akts);
+  for(const g of state.groups){
+    if(g.id.indexOf('cur:')!==0) continue;
+    if(!g.members.some(m=>KEY(m)===sc.key)) continue;
+    const bas = curRow(g.id.slice(4));
+    if(bas && say(bas.akts)) return say(bas.akts);
+  }
+  return 0;
+}
+function hocalarOf(c){
+  const h = Array.from(new Set(c.sections.map(s=>s.hoca).filter(Boolean)));
+  if(!h.length) return '';
+  return h.length<=2 ? h.join(' · ') : (h[0]+' +'+(h.length-1));
+}
+
+/* ------------------------------------------------------------- çözücü */
+function combinations(arr,k){
+  const out=[]; const n=arr.length;
+  if(k<=0) return [[]];
+  if(k>n) return [arr.slice()];
+  const idx=[];
+  (function rec(start,depth){
+    if(depth===k){ out.push(idx.map(i=>arr[i])); return; }
+    for(let i=start;i<n;i++){ idx[depth]=i; rec(i+1,depth+1); }
+  })(0,0);
+  return out;
+}
+function overlaps(a,b){ return a.day===b.day && a.start < b.end && b.start < a.end; }
+
+const LIMIT_RESULTS = 400;
+const LIMIT_NODES   = 900000;
+
+function solve(){
+  const courses = buildCourses();
+  const blocked = blockedRanges();
+
+  // kapalı saatlere düşen şubeleri ele
+  const dropped=[];
+  courses.forEach(c=>{
+    const keep = c.sections.filter(s=> !s.meetings.some(m=> blocked.some(b=>overlaps(m,b))));
+    if(keep.length!==c.sections.length) dropped.push({kod:c.kod, n:c.sections.length-keep.length, left:keep.length});
+    c.usable = keep.length?keep:[];
+  });
+
+  // sadece 3. adımda işaretlenmiş grup başlıkları hesaba katılır
+  const activeGroups = state.groups.filter(g=> g.id.indexOf('cur:')!==0 || state.take.indexOf(g.id.slice(4))>=0);
+  const inGroup = grupUyeKeys(courses, true);
+
+  const units=[];
+  const notes=[];
+  state.take.forEach(id=>{
+    const r = curRow(id); if(!r || r.role==='grup' || r.role==='yok') return;
+    const c = resolveRow(courses, r);
+    const k = c ? c.key : KEY(r.kod);
+    if(inGroup.has(k)) return;
+    if(units.some(u=>u.sets.length===1 && u.sets[0][0]===k)) return;   // aynı ders iki kez eklenmesin
+    units.push({label:r.kod, sets:[[k]]});
+  });
+  activeGroups.forEach(g=>{
+    const mem = grupDersleri(courses, g).map(c=>c.key);
+    if(!mem.length){ notes.push(g.name+' grubunda bu dönem açılan ders yok, atlandı.'); return; }
+    const pick = Math.min(g.pick, mem.length);
+    const kombin = combinations(mem, pick);
+    if(kombin.length>200) notes.push(g.name+' için '+mem.length+' seçenek var. İstemediklerini 3. adımda kaldırırsan sonuç sayısı azalır.');
+    units.push({label:g.name, sets: kombin});
+  });
+
+  function stub(k){
+    const c = state.cur.find(x=>KEY(x.kod)===k);
+    return {key:k, kod:c?c.kod:k, ad:c?c.ad:'(bilinmiyor)', usable:[{id:k+'|—',key:k,kod:c?c.kod:k,ad:c?c.ad:'',sube:'—',hoca:'',meetings:[],missing:true}]};
+  }
+  const getC = k => courses.get(k) || stub(k);
+
+  // Aynı ders birden çok seçmeli grubunda listelenebiliyor (ELEC 2 / ELEC 3 / ELEC 4 gibi).
+  // Aynı adaylara sahip gruplar arasında sıra zorlanır, böylece aynı üçlü farklı sırayla
+  // tekrar tekrar üretilmez.
+  units.forEach(u=>{ u.sig = u.sets.map(x=>x.join(',')).join(';'); });
+  units.sort((a,b)=> a.sig<b.sig?-1:(a.sig>b.sig?1:0));
+
+  const results=[]; const gorulenSet=new Set(); const gorulenSonuc=new Set();
+  let nodes=0; let blockedOut=false; let tekrarEngel=0;
+
+  function assign(j, list, chosen, occ){
+    if(results.length>=LIMIT_RESULTS) return;
+    if(nodes>LIMIT_NODES){ blockedOut=true; return; }
+    if(j===list.length){
+      const imza = chosen.map(x=>x.id).sort().join('|');
+      if(!gorulenSonuc.has(imza)){ gorulenSonuc.add(imza); results.push(chosen.slice()); }
+      return;
+    }
+    const c = list[j];
+    for(const s of c.usable){
+      nodes++;
+      let ok=true;
+      for(const m of s.meetings){ for(const o of occ){ if(overlaps(m,o)){ ok=false; break; } } if(!ok) break; }
+      if(ok) assign(j+1, list, chosen.concat([s]), occ.concat(s.meetings));
+    }
+  }
+  function pickUnit(i, keys, sonIdx){
+    if(results.length>=LIMIT_RESULTS || nodes>LIMIT_NODES) return;
+    if(i===units.length){
+      const imza = keys.slice().sort().join('|');
+      if(gorulenSet.has(imza)) return;
+      gorulenSet.add(imza);
+      const list = keys.map(getC).slice();
+      list.sort((a,b)=> a.usable.length - b.usable.length);   // en az seçenekli önce → daha hızlı budama
+      assign(0, list, [], []);
+      return;
+    }
+    const u = units[i];
+    const ayniHavuz = i>0 && units[i-1].sig===u.sig;
+    for(let si = ayniHavuz ? sonIdx+1 : 0; si < u.sets.length; si++){
+      const set = u.sets[si];
+      // bir ders iki gruba birden sayılamaz
+      let cakisma=false;
+      for(const k of set) if(keys.indexOf(k)>=0){ cakisma=true; break; }
+      if(cakisma){ tekrarEngel++; continue; }
+      pickUnit(i+1, keys.concat(set), si);
+    }
+  }
+  pickUnit(0, [], -1);
+
+  // hiç sonuç yoksa nedenini bul
+  if(!results.length){
+    const zero = [];
+    units.forEach(u=> u.sets.forEach(set=> set.forEach(k=>{
+      const c=courses.get(k);
+      if(c && !c.usable.length && !zero.includes(c.kod)) zero.push(c.kod);
+    })));
+    if(zero.length) notes.push('Şu derslerin tüm şubeleri kapattığın saatlere denk geliyor: '+zero.join(', ')+'.');
+  }
+  // gruplar için yeterli sayıda FARKLI ders açılmış mı?
+  {
+    let gerekli=0; const havuz=new Set();
+    activeGroups.forEach(g=>{
+      const mem = grupDersleri(courses, g).map(c=>c.key);
+      if(!mem.length) return;
+      gerekli += Math.min(g.pick, mem.length);
+      mem.forEach(k=>havuz.add(k));
+    });
+    if(gerekli > havuz.size){
+      notes.push('Seçmeli grupların toplam '+gerekli+' farklı ders istiyor ama bu dönem açılan aday sayısı '+havuz.size+
+                 '. Bir ders iki grubu birden dolduramadığı için program kurulamıyor, 3. adımda bazı grupların işaretini kaldır.');
+    }
+  }
+  if(dropped.length) notes.push('Kapattığın saatler yüzünden elenen şubeler: '+dropped.map(d=>d.kod+' ('+d.n+')').join(', ')+'.');
+  if(blockedOut) notes.push('İhtimal sayısı çok fazla olduğu için arama yarıda kesildi. Seçmeli gruplardaki aday sayısını azaltmayı dene.');
+
+  state.results = results.map(r=>({sections:r, stats:scoreOf(r)}));
+  sortResults();
+  state.ri = 0;
+  state.notes = notes;
+  return results.length;
+}
+
+function scoreOf(sections){
+  const evts=[];
+  sections.forEach(s=> s.meetings.forEach(m=> evts.push(m)));
+  const byDay={};
+  evts.forEach(e=>{ (byDay[e.day]=byDay[e.day]||[]).push(e); });
+  let gap=0, first=24*60, last=0, span=0;
+  const used=Object.keys(byDay).map(Number);
+  used.forEach(d=>{
+    const a=byDay[d].slice().sort((x,y)=>x.start-y.start);
+    for(let i=1;i<a.length;i++) gap += Math.max(0, a[i].start - a[i-1].end);
+    first=Math.min(first,a[0].start);
+    last =Math.max(last, a[a.length-1].end);
+    span += a[a.length-1].end - a[0].start;
+  });
+  const weekdaysUsed = used.filter(d=>d<5).length;
+  return {gap:gap, days:used.length, freeDays:Math.max(0,5-weekdaysUsed),
+          first:evts.length?first:0, last:last, span:span, weekend:used.some(d=>d>=5)};
+}
+function sortResults(){
+  const by = $('#sortBy').value;
+  const cmp = {
+    freeday:(a,b)=> b.stats.freeDays-a.stats.freeDays || a.stats.gap-b.stats.gap,
+    gap:    (a,b)=> a.stats.gap-b.stats.gap || b.stats.freeDays-a.stats.freeDays,
+    late:   (a,b)=> b.stats.first-a.stats.first || a.stats.gap-b.stats.gap,
+    early:  (a,b)=> a.stats.last-b.stats.last || a.stats.gap-b.stats.gap,
+    compact:(a,b)=> a.stats.span-b.stats.span || a.stats.gap-b.stats.gap
+  }[by];
+  state.results.sort(cmp);
+}
+
+/* --------------------------------------------------------- haftalık tablo */
+const HUES=[196,266,26,214,44,132,336,162,300,76,240,10,180,104];
+function hueOf(key){ let h=0; for(let i=0;i<key.length;i++) h=(h*31+key.charCodeAt(i))>>>0; return HUES[h%HUES.length]; }
+
+function renderWeek(host, sections, blocks){
+  host.innerHTML='';
+  const evts=[];
+  sections.forEach(s=> s.meetings.forEach(m=> evts.push({day:m.day,start:m.start,end:m.end,s:s,room:m.derslik})));
+  (blocks||[]).forEach(b=> evts.push({day:b.day,start:b.start,end:b.end,blocked:true}));
+  if(!evts.length){ host.appendChild(el('div',{class:'note',text:'Gösterilecek ders saati yok.'})); return; }
+
+  // Sınırları gerçek dersler belirler; kapalı saatler yalnızca bu aralıkta çizilir,
+  // böylece sabahı baştan sona kapatınca takvimin yarısı taramalı alan olmaz.
+  const dersEvts = evts.filter(e=>!e.blocked);
+  const baz = dersEvts.length ? dersEvts : evts;
+  let lo=Math.min.apply(null,baz.map(e=>e.start)), hi=Math.max.apply(null,baz.map(e=>e.end));
+  lo=Math.max(6*60, Math.floor(lo/60)*60); hi=Math.min(24*60, Math.ceil(hi/60)*60);
+  if(hi-lo<4*60) hi=Math.min(24*60, lo+4*60);
+  const PX=1.05, H=(hi-lo)*PX;
+  const days=[0,1,2,3,4];
+  if(dersEvts.some(e=>e.day===5)) days.push(5);
+  if(dersEvts.some(e=>e.day===6)) days.push(6);
+
+  const wk=el('div',{class:'wk'});
+  const head=el('div',{class:'wk-head'});
+  head.appendChild(el('div',{class:'wk-gutter'}));
+  days.forEach(d=> head.appendChild(el('div',{class:'cell'},[
+    el('span',{class:'gun-uzun',text:DAY_NAMES[d]}),
+    el('span',{class:'gun-kisa',text:DAY_SHORT[d]})
+  ])));
+  wk.appendChild(head);
+
+  const body=el('div',{class:'wk-body',style:'height:'+H+'px'});
+  const gut=el('div',{class:'wk-gutter'});
+  for(let t=lo;t<=hi;t+=60) gut.appendChild(el('div',{class:'wk-hour',style:'top:'+((t-lo)*PX)+'px',text:hhmm(t)}));
+  body.appendChild(gut);
+
+  days.forEach(d=>{
+    const col=el('div',{class:'wk-col'});
+    for(let t=lo;t<=hi;t+=30)
+      col.appendChild(el('div',{class:'wk-line'+(t%60?' half':''),style:'top:'+((t-lo)*PX)+'px'}));
+    evts.filter(e=>e.day===d).forEach(e=>{
+      const st=Math.max(e.start,lo), en=Math.min(e.end,hi);
+      if(en<=st) return;
+      const top=(st-lo)*PX, h=Math.max(10,(en-st)*PX-2);
+      if(e.blocked){
+        col.appendChild(el('div',{class:'ev blocked',style:'top:'+top+'px;height:'+h+'px'},[
+          el('span',{text:'kapalı'})
+        ]));
+        return;
+      }
+      const hu=hueOf(e.s.key);
+      col.appendChild(el('div',{class:'ev',
+        title:e.s.kod+' '+e.s.ad+' · Şube '+e.s.sube+(e.room?(' · '+e.room):''),
+        style:'top:'+top+'px;height:'+h+'px;background:hsl('+hu+' 46% 90%);border-left-color:hsl('+hu+' 44% 50%);color:hsl('+hu+' 56% 22%)'},[
+        el('b',{text:e.s.kod+(e.s.sube&&e.s.sube!=='—'?('/'+e.s.sube):'')}),
+        el('span',{class:'saat',text:hhmm(st)+'–'+hhmm(en)}),
+        h>42? el('span',{class:'ad',text:e.s.ad}) : null,
+        (h>58&&e.s.hoca)? el('span',{class:'who',text:e.s.hoca}) : null,
+        (h>76&&e.room)? el('span',{class:'yer',text:e.room}) : null
+      ]));
+    });
+    body.appendChild(col);
+  });
+  wk.appendChild(body); host.appendChild(wk);
+}
+
+/* --------------------------------------------------------- sonuç ekranı */
+function renderResults(){
+  const n=state.results.length;
+  const sum=$('#solveSummary');
+  let txt = n ? (n>=LIMIT_RESULTS ? (LIMIT_RESULTS+'\'den fazla program var, ilk '+LIMIT_RESULTS+' tanesi gösteriliyor.') : (n+' çakışmasız program bulundu.'))
+              : 'Çakışmayan bir program çıkmadı.';
+  if(state.notes && state.notes.length) txt += ' ' + state.notes.join(' ');
+  sum.textContent = txt;
+
+  const list=$('#reslist'); list.innerHTML='';
+  state.results.forEach((r,i)=>{
+    const c=el('div',{class:'rescard'+(i===state.ri?' is-sel':''), onclick:()=>{ state.ri=i; renderResults(); }});
+    c.appendChild(el('div',{class:'top'},[
+      el('span',{text:'Alternatif '+(i+1)}),
+      el('span',{class:'stats',text:r.stats.freeDays+' boş gün'})
+    ]));
+    c.appendChild(el('div',{class:'stats',
+      text:hhmm(r.stats.first)+'–'+hhmm(r.stats.last)+' · boşluk '+Math.round(r.stats.gap/60*10)/10+' sa'+(r.stats.weekend?' · hafta sonu var':'')}));
+    c.appendChild(el('div',{class:'small muted',style:'overflow:hidden;text-overflow:ellipsis;white-space:nowrap',
+      text:r.sections.map(x=>x.kod+(x.sube&&x.sube!=='—'?('/'+x.sube):'')).join(', ')}));
+    list.appendChild(c);
+  });
+
+  $('#counter').textContent = n ? ((state.ri+1)+' / '+n) : '—';
+  $('#prev').disabled = state.ri<=0;
+  $('#next').disabled = state.ri>=n-1;
+
+  const cur = state.results[state.ri];
+  renderWeek($('#wkHost'), cur?cur.sections:[], blockedRanges());
+
+  const lg=$('#legend'); lg.innerHTML='';
+  if(cur) cur.sections.forEach(s=>{
+    const hu=hueOf(s.key);
+    lg.appendChild(el('span',{class:'lg',style:'background:hsl('+hu+' 46% 93%);border-left-color:hsl('+hu+' 44% 50%);color:hsl('+hu+' 56% 24%)',
+      text:s.kod+' '+(s.ad||'').slice(0,34)}));
+  });
+
+  const host=$('#chosenTbl'); host.innerHTML='';
+  if(cur){
+    const t=el('table',{class:'data'});
+    t.appendChild(el('thead',{},[el('tr',{},[
+      el('th',{},['Kod']),el('th',{},['Ders']),el('th',{},['Şube']),el('th',{},['Saatler']),el('th',{},['Derslik']),el('th',{},['Öğr. elemanı'])
+    ])]));
+    const tb=el('tbody');
+    cur.sections.forEach(s=>{
+      const times = s.meetings.length
+        ? s.meetings.slice().sort((a,b)=>a.day-b.day||a.start-b.start)
+            .map(m=>DAY_SHORT[m.day]+' '+hhmm(m.start)+'–'+hhmm(m.end)).join(', ')
+        : '—';
+      const yer = Array.from(new Set(s.meetings.map(m=>m.derslik).filter(Boolean))).join(', ');
+      const mufKod = mufredatKodu(s);
+      tb.appendChild(el('tr',{},[
+        el('td',{class:'num', title: mufKod?('Müfredattaki kodu: '+mufKod):null},[s.kod]),
+        el('td',{},[s.ad||'']),
+        el('td',{},[s.sube + (s.kont?(' · '+s.kont+' kişi'):'')]),
+        el('td',{class:'num'},[times]), el('td',{},[yer]), el('td',{},[s.hoca||''])
+      ]));
+    });
+    t.appendChild(tb);
+    host.appendChild(el('div',{class:'tbl-wrap'},[t]));
+    let akts=0, bilinmeyen=0;
+    cur.sections.forEach(sc=>{ const a=aktsOfSection(sc); if(a) akts+=a; else bilinmeyen++; });
+    host.appendChild(el('div',{class:'tally',style:'margin-top:8px'},[
+      el('span',{html:'Toplam: <b>'+cur.sections.length+'</b> ders'+(akts?(' · <b>'+(Math.round(akts*10)/10)+'</b> AKTS / 30'):'')+
+        (bilinmeyen?(' · '+bilinmeyen+' dersin AKTS\'si bilinmiyor'):'')})
+    ]));
+  }
+  markDone();
+}
+$('#prev').addEventListener('click',()=>{ if(state.ri>0){state.ri--;renderResults();} });
+$('#next').addEventListener('click',()=>{ if(state.ri<state.results.length-1){state.ri++;renderResults();} });
+$('#sortBy').addEventListener('change',()=>{ sortResults(); state.ri=0; renderResults(); });
+$('#goSolve').addEventListener('click',()=>{
+  if(!state.schRows.length){ alert('Önce 2. adımda ders programını yapıştır.'); return; }
+  if(!state.take.length){ alert('Önce 3. adımda alacağın dersleri seç.'); return; }
+  solve(); goStep(5); renderResults();
+});
+$('#btnPrint').addEventListener('click',()=>window.print());
+$('#btnCopyList').addEventListener('click',()=>{
+  const cur=state.results[state.ri]; if(!cur) return;
+  const lines = cur.sections.map(s=>{
+    const t = s.meetings.slice().sort((a,b)=>a.day-b.day||a.start-b.start)
+      .map(m=>DAY_SHORT[m.day]+' '+hhmm(m.start)+'-'+hhmm(m.end)).join(', ');
+    return s.kod+'\t'+(s.ad||'')+'\t'+s.sube+'\t'+(t||'-')+'\t'+(s.hoca||'');
+  });
+  copyText(lines.join('\n'));
+});
+function copyText(txt){
+  const ta=el('textarea',{style:'position:fixed;opacity:0;left:-9999px'}); ta.value=txt;
+  document.body.appendChild(ta); ta.select();
+  let ok=false; try{ ok=document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+  if(!ok && navigator.clipboard) navigator.clipboard.writeText(txt).then(()=>toast('Kopyalandı'),()=>toast('Kopyalanamadı'));
+  else toast(ok?'Kopyalandı':'Kopyalanamadı');
+}
+function toast(msg){
+  const t=el('div',{style:'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 16px;border-radius:20px;font-size:.86rem;z-index:99',text:msg});
+  document.body.appendChild(t); setTimeout(()=>t.remove(),1600);
+}
+
+/* --------------------------------------------------------- kaydet / yükle */
+$('#btnSave').addEventListener('click',()=>{
+  const data={v:2, cur:state.cur, yariyil:state.yariyil, take:state.take,
+              schRows:state.schRows, groups:state.groups, blocked:state.blocked,
+              eslesme:state.eslesme, slot:SLOT};
+  const blob=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});
+  const a=el('a',{href:URL.createObjectURL(blob), download:'ders-programi-kayit.json'});
+  document.body.appendChild(a); a.click(); a.remove();
+});
+$('#fileLoad').addEventListener('change',ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      const d=JSON.parse(fr.result);
+      state.cur = (d.cur||[]).map(r=> Object.assign({role:'ders', pick:1}, r));
+      curIdSayaciniGuncelle();
+      state.cur.forEach(o=>{ if(!o.id) o.id = 'c'+(CURID++); });
+      state.yariyil=d.yariyil||1;
+      // eski dosyalarda take ders koduydu, artık satır kimliği
+      state.take = (d.take||[]).map(t=>{
+        if(state.cur.some(c=>c.id===t)) return t;
+        const r = state.cur.find(c=>KEY(c.kod)===KEY(t));
+        return r? r.id : null;
+      }).filter(Boolean);
+      state.schRows=d.schRows||[]; state.groups=d.groups||[]; state.eslesme=d.eslesme||{};
+      state.blocked = (d.blocked||[]).map(x=>{
+        if(typeof x!=='string') return x;                       // yeni biçim
+        const p=x.split('-'), i=+p[1];                          // eski "gün-indeks" biçimi
+        return {d:+p[0], s:BT_START+i*BT_STEP, e:BT_START+(i+1)*BT_STEP};
+      });
+      if(d.slot) SLOT=d.slot;
+      renderCurReview(); renderSchReview(); renderPick(); renderStep4(); goStep(1);
+      toast('Kayıt yüklendi');
+    }catch(e){ alert('Dosya okunamadı: '+e.message); }
+  };
+  fr.readAsText(f);
+  ev.target.value='';
+});
+$('#btnReset').addEventListener('click',()=>{
+  if(!confirm('Bütün veriler silinecek. Emin misin?')) return;
+  state.cur=[]; state.take=[]; state.schRows=[]; state.groups=[]; state.blocked=[]; state.results=[]; state.eslesme={};
+  location.reload();
+});
+
+/* --------------------------------------------------------------- örnek */
+markDone();
+})();
+
+</script>
+</body>
+</html>
